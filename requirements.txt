@@ -1,0 +1,10 @@
+glob2
+numpy
+pandas
+plotly
+matplotlib
+geopandas
+pathlib
+contextily
+dash
+dash_bootstrap_components
