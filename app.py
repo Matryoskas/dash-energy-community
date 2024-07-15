@@ -1,52 +1,41 @@
-from dash import Dash, html, dcc, callback, Output, Input
-import plotly.express as px
-import pandas as pd
-import geopandas as gpd
+from dash import Dash, html, dcc, callback, Output, Input, State, ctx
 import dash_bootstrap_components as dbc
+from algorithm import setup, algorithm
 
-energy_consumption = pd.read_csv('EC_analysis_total.csv', usecols=['SS RATIO(%)', 'SC RATIO(%)'])
-energy_consumption.rename(index={0: 'Without BESS', 1:'With BESS'},inplace=True)
-ec_figure = px.bar(energy_consumption, barmode='group')
-
-buildings_savings = pd.read_csv('EC_building_savings.csv', usecols=['Building', 'Ecost_base (€)', 'Ecost_SC (€)', 'Ecost_EC (€)', 'Ecost_EC_BESS (€)'])
-buildings_savings.set_index('Building')
-bs_figure = px.bar(buildings_savings, x='Building', y=['Ecost_base (€)', 'Ecost_SC (€)', 'Ecost_EC (€)', 'Ecost_EC_BESS (€)'], barmode='group')
-
-buildings_shapefile = gpd.read_file('zone.shp')
-gdf = buildings_shapefile.merge(buildings_savings,left_on='Name', right_on='Building',how='left')
-gdf = gdf.to_crs(epsg=4326)
-map_figure = px.choropleth_mapbox(gdf,
-                                  geojson=gdf.geometry,
-                                  locations=gdf.index,
-                                  color='Ecost_base (€)',
-                                  center={'lat': 38.77039, 'lon': -9.19363},
-                                  mapbox_style='open-street-map',
-                                  zoom=16.9,
-                                  width=1000,
-                                  height=1300)
-
-app = Dash(external_stylesheets=[dbc.themes.MINTY])
+app = Dash(__name__, external_stylesheets=[dbc.themes.MINTY])
 
 app.layout = dbc.Container([
-    html.H1(children='Custo de Energia numa Comunidade Energética', style={'textAlign':'center'}),
+    dcc.Store(id='dataframes-final', data=setup()),
+    html.H1(children='Custo de Energia numa Comunidade Energética', style={'textAlign': 'center'}),
     html.Hr(),
-    #dcc.Dropdown(df.country.unique(), 'Canada', id='dropdown-selection'),
     dbc.Row([
-        dbc.Col(dcc.Graph(figure=map_figure)),
+        dbc.Col(dcc.Loading(type='graph',
+                            children=dcc.Graph(id='map-figure'))),
         dbc.Col([
-            dbc.Row(dbc.Col(dcc.Graph(figure=ec_figure))),
-            dbc.Row(dbc.Col(dcc.Graph(figure=bs_figure)))
+            dbc.Row(dcc.Loading(type='graph',
+                                children=dcc.Graph(id='consumption-figure'))),
+            dbc.Row(dcc.Loading(type='graph',
+                                children=dcc.Graph(id='savings-figure'))),
+            dbc.Row(dbc.Button('Reset', color="primary", id='reset-button'))
         ])
     ])
 ], fluid=True)
 
-#@callback(
-#    Output('graph-content', 'figure'),
-#    Input('dropdown-selection', 'value')
-#)
-#def update_graph(value):
-#    dff = df[df.country==value]
-#    return px.line(dff, x='year', y='pop')
+@callback(
+    Output('map-figure', 'figure'),
+    Output('consumption-figure', 'figure'),
+    Output('savings-figure', 'figure'),
+    Input('map-figure', 'selectedData'),
+    State('dataframes-final', 'data'),
+    Input('reset-button', 'n_clicks')
+)
+def update_map(selectedData, data, n_clicks):
+    if (ctx.triggered_id == 'reset-button'):
+        print('reset')
+        return algorithm(None, None)
+
+    print('update')
+    return algorithm(data, selectedData)
 
 if __name__ == '__main__':
     app.run(debug=True)
