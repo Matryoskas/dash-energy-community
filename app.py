@@ -9,8 +9,10 @@ app.layout = dbc.Container([
     html.H1(children='Custo de Energia numa Comunidade Energética', style={'textAlign': 'center'}),
     html.Hr(),
     dbc.Row([
-        dbc.Col(dcc.Loading(type='graph',
+        dbc.Col([dbc.Row(dcc.Loading(type='graph',
                             children=dcc.Graph(id='map-figure'))),
+                dbc.Row(dcc.Dropdown(['By Demand', 'By Electricity Production'], 'By Demand', id='dropdown'
+                ))]),
         dbc.Col([
             dbc.Row(dcc.Loading(type='graph',
                                 children=dcc.Graph(id='consumption-figure'))),
@@ -25,17 +27,19 @@ app.layout = dbc.Container([
     Output('map-figure', 'figure'),
     Output('consumption-figure', 'figure'),
     Output('savings-figure', 'figure'),
+    Output('dropdown', 'value'),
     Input('map-figure', 'selectedData'),
     State('dataframes-final', 'data'),
+    State('dropdown', 'value'),
     Input('reset-button', 'n_clicks')
 )
-def update_map(selectedData, data, n_clicks):
+def update_map(selectedData, data, value, n_clicks):
     if (ctx.triggered_id == 'reset-button'):
         print('reset')
-        return algorithm(None, None)
+        return algorithm(None, None) + ('By Demand',)
 
     print('update')
-    return algorithm(data, selectedData)
+    return algorithm(data, selectedData, value)+ (value,)
 
 if __name__ == '__main__':
     app.run(debug=True)

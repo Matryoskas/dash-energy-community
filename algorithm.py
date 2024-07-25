@@ -18,16 +18,39 @@ def setup():
         dataframes_final.append(df_final.to_dict(orient='records')) # append dataframe per dataframe to the list
     return dataframes_final
     
-def algorithm(serializedData, selectedData=None):
+def algorithm(serializedData, selectedData=None, dropdownValue='By Demand'):
     print(selectedData)
     if selectedData is None:
         energy_consumption = pd.read_csv('data/EC_analysis_total.csv', usecols=['SS RATIO(%)', 'SC RATIO(%)'])
         energy_consumption.rename(index={0: 'Without BESS', 1:'With BESS'},inplace=True)
-        ec_figure = px.bar(energy_consumption, barmode='group')
+        ec_figure = px.bar(energy_consumption, barmode='group',height=850,title="Self-consumption and self-sufficiency")
+        
+        # Ajuste do layout para aumentar o tamanho do texto
+        # ec_figure.update_layout(
+        #     title_font_size=30,   # Tamanho do título
+        #     xaxis_title_font_size=24,   # Tamanho do título do eixo x
+        #     yaxis_title_font_size=24,   # Tamanho do título do eixo y
+        #     xaxis_tickfont_size=18,     # Tamanho dos valores do eixo x
+        #     yaxis_tickfont_size=18,      # Tamanho dos valores do eixo y
+        #     legend_font_size=16        # Tamanho do texto da legenda
+        #     ) 
+        
+        
+        
+        
 
         buildings_savings = pd.read_csv('data/EC_building_savings.csv', usecols=['Building', 'Ecost_base (€)', 'Ecost_SC (€)', 'Ecost_EC (€)', 'Ecost_EC_BESS (€)'])
         buildings_savings.set_index('Building')
-        bs_figure = px.bar(buildings_savings, x='Building', y=['Ecost_base (€)', 'Ecost_SC (€)', 'Ecost_EC (€)', 'Ecost_EC_BESS (€)'], barmode='group')
+        bs_figure = px.bar(buildings_savings, x='Building', y=['Ecost_base (€)', 'Ecost_SC (€)', 'Ecost_EC (€)', 'Ecost_EC_BESS (€)'], barmode='group',height=850,title="Energy costs annually")
+
+        # bs_figure.update_layout(
+        #     title_font_size=30,   # Tamanho do título
+        #     xaxis_title_font_size=24,   # Tamanho do título do eixo x
+        #     yaxis_title_font_size=24,   # Tamanho do título do eixo y
+        #     xaxis_tickfont_size=18,     # Tamanho dos valores do eixo x
+        #     yaxis_tickfont_size=18,
+        #     legend_font_size=16        # Tamanho do texto da legenda
+        #     )     
 
         buildings_shapefile = gpd.read_file('zone.shp')
         gdf = buildings_shapefile.merge(buildings_savings,left_on='Name', right_on='Building',how='left')
@@ -41,7 +64,14 @@ def algorithm(serializedData, selectedData=None):
                                     mapbox_style='open-street-map',
                                     zoom=16.9,
                                     width=1000,
-                                    height=1300)
+                                    height=1300
+                                    ,
+                                    title= "Annual Energy Cost (select a building set to run an EC analysis)"
+                                    )
+        # map_figure.update_layout(
+        #     title_font_size=30  # Tamanho do título
+        #     )
+        
         return map_figure, ec_figure, bs_figure
 
     dataframes_final = [pd.DataFrame(df) for df in serializedData]
@@ -119,19 +149,52 @@ def algorithm(serializedData, selectedData=None):
         dataframe_final_vf = pd.merge(dataframe_final,EC2,left_index=True,right_index=True,how='left')
         dataframes_final2.append(dataframe_final_vf)
 
+#-----------------------------------------------------------------------------
+
+# Option 1
+    if dropdownValue == 'By Demand':
+        print('By Demand')
+        for dataframe_final in dataframes_final2: 
+            conditions3 = [
+            (dataframe_final['Enet1_'+dataframe_final["Name"][0]]>0),
+            (dataframe_final['Enet1_'+dataframe_final["Name"][0]]<0)
+            ]
+            choices3 = [
+            (dataframe_final['Enet1_'+dataframe_final["Name"][0]])/dataframe_final['EC_demand'],
+            0]
+            dataframe_final['X_'+dataframe_final["Name"][0]] = np.select(conditions3, choices3)
 
 
-    for dataframe_final in dataframes_final2: 
-        conditions3 = [
-        (dataframe_final['Enet1_'+dataframe_final["Name"][0]]>0),
-        (dataframe_final['Enet1_'+dataframe_final["Name"][0]]<0)
-        ]
-        choices3 = [
-        (dataframe_final['Enet1_'+dataframe_final["Name"][0]])/dataframe_final['EC_demand'],
-        0]
-        dataframe_final['X_'+dataframe_final["Name"][0]] = np.select(conditions3, choices3)
+# Option 2 
 
+    # o surplus é distribuido de acordo com a energia produzida pelos edíficios que na hora i têm procura de energia. Assim o que é considerado é identificar
+    # se na hora i a Enet>o e o edificio tem PV (visto pelo 'E_PV_Sum'
 
+    # Número de linhas nos dataframes (assumindo que todos tenham o mesmo número de linhas)
+    elif dropdownValue == 'By Electricity Production':
+        print('By Electricity Production')
+        num_linhas = len(dataframes_final2[0])
+
+        # Percorre cada linha
+        for i in range(num_linhas):
+            # Calcula a soma das colunas E_PV das outras dataframes para a linha i, onde Enet for positivo
+            E_PV_sum = 0
+            for df in dataframes_final2:
+                enet_col = 'Enet1_' + df["Name"][0]
+                if df[enet_col].iloc[i] > 0:
+                    E_PV_sum += df['E_PV_Sum'].iloc[i]
+            
+            # Adiciona a nova coluna com o quociente E_PV/E_PV_sum a cada dataframe
+            for df in dataframes_final2:
+                enet_col = 'Enet1_' + df["Name"][0]
+                if df[enet_col].iloc[i] > 0 and E_PV_sum != 0:
+                    df.at[i, 'E_PV_ratio'] = df['E_PV_Sum'].iloc[i] / E_PV_sum
+                else:
+                    df.at[i, 'E_PV_ratio'] = 0
+                
+                df.at[i,'X_'+df["Name"][i]] = df.at[i, 'E_PV_ratio']
+
+#---------
     for dataframe_final in dataframes_final2: 
         conditions4 = [
         (dataframe_final['Enet1_'+dataframe_final["Name"][0]]>0) & (dataframe_final['Enet1_'+dataframe_final["Name"][0]]+(dataframe_final['EC_surplus']*dataframe_final['X_'+dataframe_final["Name"][0]])>0)
@@ -142,6 +205,11 @@ def algorithm(serializedData, selectedData=None):
         (dataframe_final['Enet1_'+dataframe_final["Name"][0]])+dataframe_final['EC_surplus']* dataframe_final['X_'+dataframe_final["Name"][0]],
         0]
         dataframe_final['Egrid_'+dataframe_final["Name"][0]] = np.select(conditions4, choices4)
+            
+        
+# --------------------------------------------------------------------
+
+
 
     # calculate the daily average consumption value for sizing the battery
 
@@ -426,10 +494,39 @@ def algorithm(serializedData, selectedData=None):
     # Figures
 
     consumption_columns = ['SS RATIO(%)', 'SC RATIO(%)']
-    ec_figure = px.bar(EC_total[consumption_columns], barmode='group')
+    ec_figure = px.bar(EC_total[consumption_columns], barmode='group', height=850,title="Self-consumption and self-sufficiency")
+
+
+        # Ajuste do layout para aumentar o tamanho do texto
+    # ec_figure.update_layout(
+    #         title_font_size=30,   # Tamanho do título
+    #         xaxis_title_font_size=24,   # Tamanho do título do eixo x
+    #         yaxis_title_font_size=24,   # Tamanho do título do eixo y
+    #         xaxis_tickfont_size=18,     # Tamanho dos valores do eixo x
+    #         yaxis_tickfont_size=18      # Tamanho dos valores do eixo y
+    #         )
+            
+
+    
+    
+    
+    
     
     savings_columns = ['Ecost_base (€)', 'Ecost_SC (€)', 'Ecost_EC (€)', 'Ecost_EC_BESS (€)']
-    bs_figure = px.bar(B_savings, x='Building', y=savings_columns, barmode='group')
+    bs_figure = px.bar(B_savings, x='Building', y=savings_columns, barmode='group', height=850, title="Energy costs annually")
+    
+    # bs_figure.update_layout(
+    #         title_font_size=30,   # Tamanho do título
+    #         xaxis_title_font_size=24,   # Tamanho do título do eixo x
+    #         yaxis_title_font_size=24,   # Tamanho do título do eixo y
+    #         xaxis_tickfont_size=18,     # Tamanho dos valores do eixo x
+    #         yaxis_tickfont_size=18,
+    #         legend_font_size=16        # Tamanho do texto da legenda
+    #         )   
+    
+    
+    
+    
 
     buildings_shapefile = gpd.read_file(os.getcwd() + '/zone.shp')
     gdf= buildings_shapefile.merge(B_savings,left_on='Name', right_on='Building',how='left')
@@ -443,6 +540,14 @@ def algorithm(serializedData, selectedData=None):
                                   mapbox_style='open-street-map',
                                   zoom=16.9,
                                   width=1000,
-                                  height=1300)
+                                  height=1300
+                                  ,
+                                  title= "Annual Energy Cost (select a building set to run an EC analysis)"
+                                  )
+    
+    # map_figure.update_layout(
+    #         title_font_size=30  # Tamanho do título
+    #         )
+    
     
     return map_figure, ec_figure, bs_figure
