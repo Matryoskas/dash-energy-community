@@ -5,23 +5,11 @@ import os
 import numpy as np
 import plotly.express as px
 import geopandas as gpd
-from io import StringIO
 
-def setup():
-    print('setup')
-    csvfiles_final = glob2.glob(os.path.join(os.getcwd(), 'B*[0-9]_final.csv')) # paths for the building files
-
-    dataframes_final = [] #empty list
-    for csvfile_final in csvfiles_final:
-        df_final = pd.read_csv(csvfile_final, sep =',') #opening the file
-        df_final= df_final.rename(columns={'Unnamed: 0': 'Date'})# rename 1st columns
-        dataframes_final.append(df_final.to_dict(orient='records')) # append dataframe per dataframe to the list
-    return dataframes_final
-    
-def algorithm(serializedData, selectedData=None, dropdownValue='By Demand'):
+def algorithm(selectedData=None, dropdownValue='By Demand'):
     print(selectedData)
     if selectedData is None:
-        energy_consumption = pd.read_csv('data/EC_analysis_total.csv', usecols=['SS RATIO(%)', 'SC RATIO(%)'])
+        energy_consumption = pd.read_csv('viana_do_castelo/EC_analysis_total.csv', usecols=['SS RATIO(%)', 'SC RATIO(%)'])
         energy_consumption.rename(index={0: 'Without BESS', 1:'With BESS'},inplace=True)
         ec_figure = px.bar(energy_consumption, barmode='group',height=850,title="Self-consumption and self-sufficiency")
         
@@ -35,11 +23,7 @@ def algorithm(serializedData, selectedData=None, dropdownValue='By Demand'):
         #     legend_font_size=16        # Tamanho do texto da legenda
         #     ) 
         
-        
-        
-        
-
-        buildings_savings = pd.read_csv('data/EC_building_savings.csv', usecols=['Building', 'Ecost_base (€)', 'Ecost_SC (€)', 'Ecost_EC (€)', 'Ecost_EC_BESS (€)'])
+        buildings_savings = pd.read_csv('viana_do_castelo/EC_building_savings.csv', usecols=['Building', 'Ecost_base (€)', 'Ecost_SC (€)', 'Ecost_EC (€)', 'Ecost_EC_BESS (€)'])
         buildings_savings.set_index('Building')
         bs_figure = px.bar(buildings_savings, x='Building', y=['Ecost_base (€)', 'Ecost_SC (€)', 'Ecost_EC (€)', 'Ecost_EC_BESS (€)'], barmode='group',height=850,title="Energy costs annually")
 
@@ -52,17 +36,18 @@ def algorithm(serializedData, selectedData=None, dropdownValue='By Demand'):
         #     legend_font_size=16        # Tamanho do texto da legenda
         #     )     
 
-        buildings_shapefile = gpd.read_file('zone.shp')
+        buildings_shapefile = gpd.read_file('viana_do_castelo/zone.shp')
         gdf = buildings_shapefile.merge(buildings_savings,left_on='Name', right_on='Building',how='left')
         gdf = gdf.to_crs(epsg=4326)
         map_figure = px.choropleth_mapbox(gdf,
                                     geojson=gdf.geometry,
                                     locations=gdf.index,
                                     color='Ecost_base (€)',
-                                    hover_data='Building',
-                                    center={'lat': 38.77039, 'lon': -9.19363},
+                                    hover_data={'Building','Ecost_base (€)','Ecost_SC (€)', 'Ecost_EC_BESS (€)'                                     
+                                    },
+                                    center={'lat': 41.68307857293268, 'lon': -8.821966245912416},  
                                     mapbox_style='open-street-map',
-                                    zoom=16.9,
+                                    zoom=16,
                                     width=1000,
                                     height=1300
                                     ,
@@ -74,11 +59,21 @@ def algorithm(serializedData, selectedData=None, dropdownValue='By Demand'):
         
         return map_figure, ec_figure, bs_figure
 
-    dataframes_final = [pd.DataFrame(df) for df in serializedData]
+    csvfiles_final = glob2.glob(os.path.join('./viana_do_castelo', 'B*[0-9]_final.csv')) # paths for the building files
+
+    dataframes_final = [] #empty list
+    for csvfile_final in csvfiles_final:
+        df_final = pd.read_csv(csvfile_final, sep =',') #opening the file
+        df_final= df_final.rename(columns={'Unnamed: 0': 'Date'})# rename 1st columns
+        dataframes_final.append(df_final) # append dataframe per dataframe to the list
+
     points = selectedData['points']
     buildings = []
     for point in points:
-        buildings.append(point['customdata'][0])
+        for customdata in point['customdata']:
+            if isinstance(customdata, str):
+                buildings.append(customdata)
+    print(buildings)
     dataframes_final = [dataframe for dataframe in dataframes_final if dataframe.at[0, 'Name'] in buildings]
 
     dff=dataframes_final[0] # example of calling the first dataframe from the list
@@ -114,7 +109,7 @@ def algorithm(serializedData, selectedData=None, dropdownValue='By Demand'):
 
     # EC_hourly.head(2)
 
-    EC_hourly.to_csv('EC_hourly_gen_dem.csv')
+    # EC_hourly.to_csv('EC_hourly_gen_dem.csv')
 
     #EC_to_grid:
     conditions = [
@@ -151,7 +146,7 @@ def algorithm(serializedData, selectedData=None, dropdownValue='By Demand'):
 
 #-----------------------------------------------------------------------------
 
-# Option 1
+# Option 1 SHARE BY DEMAND
     if dropdownValue == 'By Demand':
         print('By Demand')
         for dataframe_final in dataframes_final2: 
@@ -165,34 +160,33 @@ def algorithm(serializedData, selectedData=None, dropdownValue='By Demand'):
             dataframe_final['X_'+dataframe_final["Name"][0]] = np.select(conditions3, choices3)
 
 
-# Option 2 
+# Option 2 SHARE BY ELEC PRODUCED
 
-    # o surplus é distribuido de acordo com a energia produzida pelos edíficios que na hora i têm procura de energia. Assim o que é considerado é identificar
-    # se na hora i a Enet>o e o edificio tem PV (visto pelo 'E_PV_Sum'
+# o surplus é distribuido de acordo com a energia produzida pelos edíficios que na hora i têm procura de energia. Assim o que é considerado é identificar
+# se na hora i a Enet>o e o edificio tem PV (visto pelo 'E_PV_Sum')
 
-    # Número de linhas nos dataframes (assumindo que todos tenham o mesmo número de linhas)
     elif dropdownValue == 'By Electricity Production':
-        print('By Electricity Production')
+        # Número de linhas nos dataframes (assumindo que todos tenham o mesmo número de linhas)
         num_linhas = len(dataframes_final2[0])
-
+        
         # Percorre cada linha
         for i in range(num_linhas):
             # Calcula a soma das colunas E_PV das outras dataframes para a linha i, onde Enet for positivo
-            E_PV_sum = 0
+            E_PV_sum_total= 0
             for df in dataframes_final2:
                 enet_col = 'Enet1_' + df["Name"][0]
                 if df[enet_col].iloc[i] > 0:
-                    E_PV_sum += df['E_PV_Sum'].iloc[i]
+                    E_PV_sum_total += df['E_PV_Sum'].iloc[i]
             
             # Adiciona a nova coluna com o quociente E_PV/E_PV_sum a cada dataframe
             for df in dataframes_final2:
                 enet_col = 'Enet1_' + df["Name"][0]
-                if df[enet_col].iloc[i] > 0 and E_PV_sum != 0:
-                    df.at[i, 'E_PV_ratio'] = df['E_PV_Sum'].iloc[i] / E_PV_sum
+                if df[enet_col].iloc[i] > 0 and E_PV_sum_total != 0:
+                    df.at[i,'X_'+df["Name"][0]] = df['E_PV_Sum'].iloc[i] / E_PV_sum_total# acho que se pode tirar o loop do df['E_PV_Sum']
                 else:
-                    df.at[i, 'E_PV_ratio'] = 0
+                    df.at[i,'X_'+df["Name"][0]] = 0
                 
-                df.at[i,'X_'+df["Name"][i]] = df.at[i, 'E_PV_ratio']
+        #         df.at[i,'X_'+df["Name"][i]] = df.at[i, 'E_PV_ratio']
 
 #---------
     for dataframe_final in dataframes_final2: 
@@ -205,8 +199,7 @@ def algorithm(serializedData, selectedData=None, dropdownValue='By Demand'):
         (dataframe_final['Enet1_'+dataframe_final["Name"][0]])+dataframe_final['EC_surplus']* dataframe_final['X_'+dataframe_final["Name"][0]],
         0]
         dataframe_final['Egrid_'+dataframe_final["Name"][0]] = np.select(conditions4, choices4)
-            
-        
+                    
 # --------------------------------------------------------------------
 
 
@@ -284,7 +277,7 @@ def algorithm(serializedData, selectedData=None, dropdownValue='By Demand'):
         # Step 15
         EC.at[i,'GRID_to_EC_B']=max(curr_line.at['GRID_to_EC']-curr_line.at['DISC'],0)    
 
-    EC.to_csv('EC_bess.csv')
+    # EC.to_csv('EC_bess.csv')
 
     dataframes_final3 = [] #empty list
     for dataframe_final in dataframes_final2: 
@@ -314,7 +307,7 @@ def algorithm(serializedData, selectedData=None, dropdownValue='By Demand'):
     #for dataframe_final in dataframes_final4:
     #   dataframe_final['Cost_EC'[0]]=dataframe_final['Egrid_'+dataframe_final["Name"][0]]*dataframe_final['Tariff_EC']
 
-    dataframes_final4[0].to_csv('EC_d1bfinal.csv')
+    # dataframes_final4[0].to_csv('EC_d1bfinal.csv')
 
     for dataframe_final in dataframes_final4:
         dataframe_final['Cost_base']=dataframe_final['GRID_kWh']*dataframe_final['Tariff_base']
@@ -364,7 +357,7 @@ def algorithm(serializedData, selectedData=None, dropdownValue='By Demand'):
 
     B_savings.head(2)
 
-    B_savings.to_csv('EC_building_savings.csv')
+    # B_savings.to_csv('EC_building_savings.csv')
 
     #don't consider the columns created with random letters, was only confirming step by step the calculations.
     #here there's an error in the last columns : Income EC_total and income EC_B_total
@@ -399,7 +392,7 @@ def algorithm(serializedData, selectedData=None, dropdownValue='By Demand'):
 
     EC_total_savings
 
-    EC_total_savings.to_csv('EC_total_savings.csv')
+    # EC_total_savings.to_csv('EC_total_savings.csv')
 
     EC_analysis=[]
     for dataframe_final in dataframes_final3: 
@@ -442,7 +435,7 @@ def algorithm(serializedData, selectedData=None, dropdownValue='By Demand'):
 
     # EC_analysis
 
-    EC_analysis.to_csv('EC_analysis_buildings.csv')
+    # EC_analysis.to_csv('EC_analysis_buildings.csv')
 
     Demand=EC_analysis['Demand (kWh/year)'].agg(lambda x : x.sum())
 
@@ -489,7 +482,7 @@ def algorithm(serializedData, selectedData=None, dropdownValue='By Demand'):
 
     # EC_total
 
-    EC_total.to_csv('EC_analysis_total.csv')
+    # EC_total.to_csv('EC_analysis_total.csv')
 
     # Figures
 
@@ -528,17 +521,18 @@ def algorithm(serializedData, selectedData=None, dropdownValue='By Demand'):
     
     
 
-    buildings_shapefile = gpd.read_file(os.getcwd() + '/zone.shp')
+    buildings_shapefile = gpd.read_file('viana_do_castelo/zone.shp')
     gdf= buildings_shapefile.merge(B_savings,left_on='Name', right_on='Building',how='left')
     gdf = gdf.to_crs(epsg=4326)
     map_figure = px.choropleth_mapbox(gdf,
                                   geojson=gdf.geometry,
                                   locations=gdf.index,
                                   color='Ecost_base (€)',
-                                  hover_data='Building',
-                                  center={'lat': 38.77039, 'lon': -9.19363},
+                                  hover_data={'Building','Ecost_base (€)','Ecost_SC (€)', 'Ecost_EC_BESS (€)'                                     
+                                  },
+                                  center={'lat': 41.68307857293268, 'lon': -8.821966245912416},  
                                   mapbox_style='open-street-map',
-                                  zoom=16.9,
+                                  zoom=16,
                                   width=1000,
                                   height=1300
                                   ,
