@@ -10,6 +10,8 @@ app.layout = dbc.Container([
     dbc.Row([
         dbc.Col([dbc.Row(dcc.Loading(type='graph',
                             children=dcc.Graph(id='map-figure'))),
+                dbc.Row(dcc.Input(id='battery-efficiency', type='number', min=0, max=1, step=0.1, placeholder='Eficiência da bateria')),
+                html.Br(),
                 dbc.Row(dcc.Dropdown(['By Demand', 'By Electricity Production'], 'By Demand', id='dropdown'
                 ))]),
         dbc.Col([
@@ -28,16 +30,17 @@ app.layout = dbc.Container([
     Output('savings-figure', 'figure'),
     Output('dropdown', 'value'),
     Input('map-figure', 'selectedData'),
+    State('battery-efficiency', 'value'),
     State('dropdown', 'value'),
     Input('reset-button', 'n_clicks')
 )
-def update_map(selectedData, value, n_clicks):
+def update_map(selectedData, batt_eff, value, n_clicks):
     if (ctx.triggered_id == 'reset-button'):
         print('reset')
         return algorithm() + ('By Demand',)
 
     print('update')
-    return algorithm(selectedData, value)+ (value,)
+    return algorithm(selectedData, value, batt_eff)+ (value,)
 
 if __name__ == '__main__':
     app.run(debug=True)

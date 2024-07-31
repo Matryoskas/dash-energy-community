@@ -6,7 +6,7 @@ import numpy as np
 import plotly.express as px
 import geopandas as gpd
 
-def algorithm(selectedData=None, dropdownValue='By Demand'):
+def algorithm(selectedData=None, dropdownValue='By Demand', battery_efficiency=1):
     print(selectedData)
     if selectedData is None:
         energy_consumption = pd.read_csv('viana_do_castelo/EC_analysis_total.csv', usecols=['SS RATIO(%)', 'SC RATIO(%)'])
@@ -221,7 +221,7 @@ def algorithm(selectedData=None, dropdownValue='By Demand'):
 
     # average_daily_consumption_year
 
-    CAPACITY_kWh=average_daily_consumption_year #average daily demand
+    CAPACITY_kWh=average_daily_consumption_year * battery_efficiency #average daily demand
     SOCMAX=0.95
     SOCMAX_kWh=SOCMAX*CAPACITY_kWh
     SOCMIN=0.10
