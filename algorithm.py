@@ -4,11 +4,12 @@ import glob2
 import os
 import numpy as np
 import plotly.express as px
+import pydeck as pdk
 import geopandas as gpd
+import matplotlib.pyplot as plt
 
-def algorithm(selectedData=None, dropdownValue='By Demand', battery_efficiency=1):
-    print(selectedData)
-    if selectedData is None:
+def algorithm(outlined_buildings=[], dropdownValue='By Demand', battery_efficiency=1):
+    if not outlined_buildings:
         energy_consumption = pd.read_csv('viana_do_castelo/EC_analysis_total.csv', usecols=['SS RATIO(%)', 'SC RATIO(%)'])
         energy_consumption.rename(index={0: 'Without BESS', 1:'With BESS'},inplace=True)
         ec_figure = px.bar(energy_consumption, barmode='group',height=850,title="Self-consumption and self-sufficiency")
@@ -36,27 +37,8 @@ def algorithm(selectedData=None, dropdownValue='By Demand', battery_efficiency=1
         #     legend_font_size=16        # Tamanho do texto da legenda
         #     )     
 
-        buildings_shapefile = gpd.read_file('viana_do_castelo/zone.shp')
-        gdf = buildings_shapefile.merge(buildings_savings,left_on='Name', right_on='Building',how='left')
-        gdf = gdf.to_crs(epsg=4326)
-        map_figure = px.choropleth_mapbox(gdf,
-                                    geojson=gdf.geometry,
-                                    locations=gdf.index,
-                                    color='Ecost_base (€)',
-                                    hover_data={'Building','Ecost_base (€)','Ecost_SC (€)', 'Ecost_EC_BESS (€)'                                     
-                                    },
-                                    center={'lat': 41.68307857293268, 'lon': -8.821966245912416},  
-                                    mapbox_style='open-street-map',
-                                    zoom=16,
-                                    width=1000,
-                                    height=1300
-                                    ,
-                                    title= "Annual Energy Cost (select a building set to run an EC analysis)"
-                                    )
-        # map_figure.update_layout(
-        #     title_font_size=30  # Tamanho do título
-        #     )
-        
+        map_figure = create_map([], buildings_savings)
+
         return map_figure, ec_figure, bs_figure
 
     csvfiles_final = glob2.glob(os.path.join('./viana_do_castelo', 'B*[0-9]_final.csv')) # paths for the building files
@@ -67,14 +49,7 @@ def algorithm(selectedData=None, dropdownValue='By Demand', battery_efficiency=1
         df_final= df_final.rename(columns={'Unnamed: 0': 'Date'})# rename 1st columns
         dataframes_final.append(df_final) # append dataframe per dataframe to the list
 
-    points = selectedData['points']
-    buildings = []
-    for point in points:
-        for customdata in point['customdata']:
-            if isinstance(customdata, str):
-                buildings.append(customdata)
-    print(buildings)
-    dataframes_final = [dataframe for dataframe in dataframes_final if dataframe.at[0, 'Name'] in buildings]
+    dataframes_final = [dataframe for dataframe in dataframes_final if dataframe.at[0, 'Name'] in outlined_buildings]
 
     dff=dataframes_final[0] # example of calling the first dataframe from the list
     EC = dff[["Date"]].copy() # create a dataframe with only the first column by copying it
@@ -430,9 +405,6 @@ def algorithm(selectedData=None, dropdownValue='By Demand', battery_efficiency=1
 
         EC_analysis.loc[i,'Self_consumed_energy (kWh/year)']=locals()["Self_consumed_energy_"+EC_analysis.loc[i,'Building']]
         
-        
-
-
     # EC_analysis
 
     # EC_analysis.to_csv('EC_analysis_buildings.csv')
@@ -498,13 +470,7 @@ def algorithm(selectedData=None, dropdownValue='By Demand', battery_efficiency=1
     #         xaxis_tickfont_size=18,     # Tamanho dos valores do eixo x
     #         yaxis_tickfont_size=18      # Tamanho dos valores do eixo y
     #         )
-            
 
-    
-    
-    
-    
-    
     savings_columns = ['Ecost_base (€)', 'Ecost_SC (€)', 'Ecost_EC (€)', 'Ecost_EC_BESS (€)']
     bs_figure = px.bar(B_savings, x='Building', y=savings_columns, barmode='group', height=850, title="Energy costs annually")
     
@@ -516,32 +482,81 @@ def algorithm(selectedData=None, dropdownValue='By Demand', battery_efficiency=1
     #         yaxis_tickfont_size=18,
     #         legend_font_size=16        # Tamanho do texto da legenda
     #         )   
-    
-    
-    
-    
 
-    buildings_shapefile = gpd.read_file('viana_do_castelo/zone.shp')
-    gdf= buildings_shapefile.merge(B_savings,left_on='Name', right_on='Building',how='left')
-    gdf = gdf.to_crs(epsg=4326)
-    map_figure = px.choropleth_mapbox(gdf,
-                                  geojson=gdf.geometry,
-                                  locations=gdf.index,
-                                  color='Ecost_base (€)',
-                                  hover_data={'Building','Ecost_base (€)','Ecost_SC (€)', 'Ecost_EC_BESS (€)'                                     
-                                  },
-                                  center={'lat': 41.68307857293268, 'lon': -8.821966245912416},  
-                                  mapbox_style='open-street-map',
-                                  zoom=16,
-                                  width=1000,
-                                  height=1300
-                                  ,
-                                  title= "Annual Energy Cost (select a building set to run an EC analysis)"
-                                  )
-    
-    # map_figure.update_layout(
-    #         title_font_size=30  # Tamanho do título
-    #         )
-    
-    
+    map_figure = create_map(outlined_buildings, B_savings)    
+
     return map_figure, ec_figure, bs_figure
+
+def get_color(value):
+    colormap = plt.get_cmap('plasma')
+    # Get the RGBA color from the colormap
+    rgba = colormap(value)
+    # Convert RGBA to a list of integers in the format [R, G, B, A]
+    color = [int(255 * c) for c in rgba]
+    return color
+
+def create_map(outlined_buildings=[], buildings_savings=None, previous_layer=None):
+    if buildings_savings is None:
+        buildings_savings = pd.read_csv('viana_do_castelo/EC_building_savings.csv', usecols=['Building', 'Ecost_base (€)', 'Ecost_SC (€)', 'Ecost_EC (€)', 'Ecost_EC_BESS (€)'])
+    buildings_savings.set_index('Building')
+    buildings_shapefile = gpd.read_file('viana_do_castelo/zone.shp')
+    gdf = buildings_shapefile.merge(buildings_savings,left_on='Name', right_on='Building',how='left')
+    gdf = gdf.to_crs(epsg=4326)
+
+    gdf['fill_color'] = (gdf['Ecost_base (€)'] - gdf['Ecost_base (€)'].min()) / (gdf['Ecost_base (€)'].max() - gdf['Ecost_base (€)'].min()) # normalize cost between 0-1
+    gdf['fill_color'] = gdf['fill_color'].apply(get_color)
+
+    # If buildings are selected, change their outline color to visually indicate selection
+    gdf['line_color'] = gdf.apply(
+        lambda row: [255, 0, 0, 255] if row['Building'] in outlined_buildings else [255, 255, 255, 255], axis=1
+    )
+    view_state = pdk.ViewState(
+        **{
+            "latitude": 41.68307857293268,
+            "longitude": -8.821966245912416,
+            "zoom": 16,
+            "maxZoom": 20,
+            "pitch": 45,
+            "bearing": 0,
+        }
+    )
+
+    if previous_layer is None:
+        # Layer for extruded buildings
+        extruded_layer = pdk.Layer(
+            "GeoJsonLayer",
+            gdf,
+            opacity=0.8,
+            stroked=False,  # Disable strokes for this layer
+            filled=True,
+            extruded=True,
+            get_polygon="geometry",
+            get_fill_color="fill_color",
+            get_elevation="height_ag * 2",
+            auto_highlight=True,
+            pickable=True,
+            id='extruded-layer'
+        )
+    else:
+        extruded_layer = previous_layer
+
+    # Separate layer for building outlines (non-extruded)
+    outline_layer = pdk.Layer(
+        "GeoJsonLayer",
+        gdf,
+        opacity=1,
+        stroked=True,  # Enable strokes for this layer
+        filled=False,  # Disable fill for this layer
+        extruded=False,  # Ensure outlines are 2D
+        get_polygon="geometry",
+        get_line_color="line_color",
+        line_width_min_pixels=3,  # Set outline thickness
+    )
+
+    map = pdk.Deck(
+        [extruded_layer, outline_layer],  # Stack the layers
+        initial_view_state=view_state,
+        map_style=pdk.map_styles.DARK,
+    )
+
+    return map.to_json()
