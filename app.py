@@ -10,25 +10,38 @@ map = create_map()
 
 app = Dash(__name__, external_stylesheets=[dbc.themes.MINTY])
 
-tooltip = {"html": "<b>Building:</b> {Building} <br /><b>Ecost_base (€):</b> {Ecost_base (€)} <br /><b>Ecost_SC (€):</b> {Ecost_SC (€)} <br /><b>Ecost_EC_BESS (€):</b> {Ecost_EC_BESS (€)}"}
+tooltip = {"html": "<b>Building:</b> {Name} <br /><b>Ecost_base (€):</b> {Ecost_base (€)} <br /><b>Ecost_SC (€):</b> {Ecost_SC (€)} <br /><b>Ecost_EC_BESS (€):</b> {Ecost_EC_BESS (€)}"}
 
 app.layout = dbc.Container([
     html.H1(children='Energy community - neighborhood in Viana do Castelo', style={'textAlign': 'center'}),
     html.Hr(),
     dbc.Row([
         dbc.Col([
-                dbc.Row(dcc.Input(id='battery-efficiency', type='number', value=1, min=0, max=1, step=0.1, placeholder='Eficiência da bateria')),
-                html.Br(),
-                dbc.Row(dcc.Dropdown(['By Demand', 'By Electricity Production'], 'By Demand', id='dropdown')),
-                dbc.Row(dcc.Loading(type='graph', children = dash_deck.DeckGL(map, id="3d-map", mapboxKey=mapbox_api_token, tooltip=tooltip, enableEvents=['click'], style={"width": "45vw", "height": "60vh"})))
-                ]),
+            dbc.Row(dcc.Input(id='battery-efficiency', type='number', value=1, min=0, max=1, step=0.1, placeholder='Eficiência da bateria')),
+            html.Br(),
+            dbc.Row(dcc.Dropdown(['By Demand', 'By Electricity Production'], 'By Demand', id='dropdown')),
+            html.Br(),
+            dbc.Row(dcc.Loading(type='graph',
+                                children=dash_deck.DeckGL(
+                                    map, 
+                                    id="3d-map", 
+                                    mapboxKey=mapbox_api_token, 
+                                    tooltip=tooltip, 
+                                    enableEvents=['click'], 
+                                    style={"width": "45vw", "height": "60vh", "position": "relative", "zIndex": "0"}
+                                ))),
+            html.Br(),
+            dbc.Row([
+                dbc.Col(html.Button('Run Algorithm', id='run-button')),
+                dbc.Col(html.Button('Reset', id='reset-button')),
+            ]),
+
+        ]),
         dbc.Col([
             dbc.Row(dcc.Loading(type='graph',
                                 children=dcc.Graph(id='consumption-figure'))),
             dbc.Row(dcc.Loading(type='graph',
                                 children=dcc.Graph(id='savings-figure'))),
-            dbc.Row([dbc.Col(dbc.Button('Run Algorithm', color="primary", id='run-button')),
-                    dbc.Col(dbc.Button('Reset', color="primary", id='reset-button'))])
         ])
     ])
 ], fluid=True)
