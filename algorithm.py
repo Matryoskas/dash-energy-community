@@ -6,7 +6,13 @@ import numpy as np
 import plotly.express as px
 import pydeck as pdk
 import geopandas as gpd
-import matplotlib.pyplot as plt
+
+# Define a simple colormap with key RGBA values (Plasma-like colors)
+plasma_colormap = [
+    [12, 7, 134, 255],   # Dark blue (start)
+    [219, 91, 103, 255],  # Pink
+    [239, 248, 33, 255], # Yellow (end)
+]
 
 def algorithm(outlined_buildings=[], dropdownValue='By Demand', battery_efficiency=1):
     if not outlined_buildings:
@@ -487,13 +493,32 @@ def algorithm(outlined_buildings=[], dropdownValue='By Demand', battery_efficien
 
     return map_figure, ec_figure, bs_figure
 
-def get_color(value):
-    colormap = plt.get_cmap('plasma')
-    # Get the RGBA color from the colormap
-    rgba = colormap(value)
-    # Convert RGBA to a list of integers in the format [R, G, B, A]
-    color = [int(255 * c) for c in rgba]
-    return color
+def interpolate_color(value, colormap=plasma_colormap):
+    """
+    Linearly interpolate between colors in a colormap.
+
+    Parameters:
+        value (float): A normalized float (0 to 1) indicating position along the colormap.
+        colormap (list): A list of RGBA colors as [R, G, B, A].
+
+    Returns:
+        color (list): Interpolated RGBA color.
+    """
+    if value < 0: value = 0
+    if value > 1: value = 1
+    
+    # Find which two colors to interpolate between
+    num_colors = len(colormap)
+    idx = int(value * (num_colors - 1))  # Get index
+    t = (value * (num_colors - 1)) - idx  # Interpolation factor between idx and idx + 1
+    
+    # Interpolate between two colors
+    color1 = np.array(colormap[idx])
+    color2 = np.array(colormap[min(idx + 1, num_colors - 1)])
+    
+    # Linear interpolation between color1 and color2
+    color = (1 - t) * color1 + t * color2
+    return [int(c) for c in color]
 
 def create_map(outlined_buildings=[], buildings_savings=None, previous_layer=None):
     if buildings_savings is None:
@@ -504,7 +529,7 @@ def create_map(outlined_buildings=[], buildings_savings=None, previous_layer=Non
     gdf = gdf.to_crs(epsg=4326)
 
     gdf['fill_color'] = (gdf['Ecost_base (€)'] - gdf['Ecost_base (€)'].min()) / (gdf['Ecost_base (€)'].max() - gdf['Ecost_base (€)'].min()) # normalize cost between 0-1
-    gdf['fill_color'] = gdf['fill_color'].apply(get_color)
+    gdf['fill_color'] = gdf['fill_color'].apply(interpolate_color)
 
     # If buildings are selected, change their outline color to visually indicate selection
     gdf['line_color'] = gdf.apply(
