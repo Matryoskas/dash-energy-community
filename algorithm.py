@@ -525,7 +525,7 @@ def create_map(outlined_buildings=[], buildings_savings=None, previous_layer=Non
         buildings_savings = pd.read_csv('viana_do_castelo/EC_building_savings.csv', usecols=['Building', 'Ecost_base (€)', 'Ecost_SC (€)', 'Ecost_EC (€)', 'Ecost_EC_BESS (€)'])
     buildings_savings.set_index('Building')
     buildings_shapefile = gpd.read_file('viana_do_castelo/zone.shp')
-    gdf = buildings_shapefile.merge(buildings_savings,left_on='Name', right_on='Building',how='left')
+    gdf = buildings_shapefile.merge(buildings_savings,left_on='Name', right_on='Building',how='right')
     gdf = gdf.to_crs(epsg=4326)
 
     gdf['fill_color'] = (gdf['Ecost_base (€)'] - gdf['Ecost_base (€)'].min()) / (gdf['Ecost_base (€)'].max() - gdf['Ecost_base (€)'].min()) # normalize cost between 0-1
