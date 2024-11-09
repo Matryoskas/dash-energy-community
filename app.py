@@ -46,14 +46,13 @@ app.layout = dbc.Container([
                     mapboxKey=mapbox_api_token,
                     tooltip=tooltip,
                     enableEvents=['click'],
-                    style={"width": "100%", "height": "50vh"}
+                    style={"width": "45vw", "height": "60vh", "position": "relative", "zIndex": "0"}
                 )
             ),
             # Segundo gráfico (abaixo do mapa) com margem superior
             dbc.Row(
                 dcc.Loading(type='graph', children=dcc.Graph(id='PV-figure')),
-                style={"marginTop": "50vh","width": "100%", "height": "50vh"}  # Define uma margem superior
-                # style={"marginTop": "1000px"}  # Define uma margem superior
+                style={"width": "100%", "height": "50vh"}
             )
         ], width=6),  # Define metade da largura para esta coluna
         # Segunda coluna: Configurações da Bateria e Gráficos
