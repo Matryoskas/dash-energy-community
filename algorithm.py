@@ -16,36 +16,7 @@ plasma_colormap = [
 
 def algorithm(outlined_buildings=[], dropdownValue='By Demand', battery_efficiency=1):
     if not outlined_buildings:
-        energy_consumption = pd.read_csv('viana_do_castelo/EC_analysis_total.csv', usecols=['SS RATIO(%)', 'SC RATIO(%)'])
-        energy_consumption.rename(index={0: 'Without BESS', 1:'With BESS'},inplace=True)
-        ec_figure = px.bar(energy_consumption, barmode='group',height=850,title="Self-consumption and self-sufficiency")
-        
-        # Ajuste do layout para aumentar o tamanho do texto
-        # ec_figure.update_layout(
-        #     title_font_size=30,   # Tamanho do título
-        #     xaxis_title_font_size=24,   # Tamanho do título do eixo x
-        #     yaxis_title_font_size=24,   # Tamanho do título do eixo y
-        #     xaxis_tickfont_size=18,     # Tamanho dos valores do eixo x
-        #     yaxis_tickfont_size=18,      # Tamanho dos valores do eixo y
-        #     legend_font_size=16        # Tamanho do texto da legenda
-        #     ) 
-        
-        buildings_savings = pd.read_csv('viana_do_castelo/EC_building_savings.csv', usecols=['Building', 'Ecost_base (€)', 'Ecost_SC (€)', 'Ecost_EC (€)', 'Ecost_EC_BESS (€)'])
-        buildings_savings.set_index('Building')
-        bs_figure = px.bar(buildings_savings, x='Building', y=['Ecost_base (€)', 'Ecost_SC (€)', 'Ecost_EC (€)', 'Ecost_EC_BESS (€)'], barmode='group',height=850,title="Energy costs annually")
-
-        # bs_figure.update_layout(
-        #     title_font_size=30,   # Tamanho do título
-        #     xaxis_title_font_size=24,   # Tamanho do título do eixo x
-        #     yaxis_title_font_size=24,   # Tamanho do título do eixo y
-        #     xaxis_tickfont_size=18,     # Tamanho dos valores do eixo x
-        #     yaxis_tickfont_size=18,
-        #     legend_font_size=16        # Tamanho do texto da legenda
-        #     )     
-
-        map_figure = create_map([], buildings_savings)
-
-        return map_figure, ec_figure, bs_figure
+        return create_figures()
 
     csvfiles_final = glob2.glob(os.path.join('./viana_do_castelo', 'B*[0-9]_final.csv')) # paths for the building files
 
@@ -318,6 +289,8 @@ def algorithm(outlined_buildings=[], dropdownValue='By Demand', battery_efficien
         locals()["SurpluesEC_B"+ str(dataframe_final["Name"][0])]= dataframe_final['EC_to_GRID_B'].agg(lambda x : x.sum())
         locals()["Income_EC_total"+ str(dataframe_final["Name"][0])]= dataframe_final['Income_EC'].agg(lambda x : x.sum())
         locals()["Income_EC_B_total"+ str(dataframe_final["Name"][0])]= dataframe_final['Income_EC_B'].agg(lambda x : x.sum())
+        locals()["PV_Power_W"+ str(dataframe_final["Name"][0])]= dataframe_final['PV_Power_W'][0]
+        locals()["PV_Investment_€"+ str(dataframe_final["Name"][0])]= dataframe_final['PV_Investment_€'][0]
 
     for i in range(len(B_savings)):
         B_savings.loc[i,'Ecost_base (€)']=locals()["Total_cost_base"+B_savings.loc[i,'Building']]
@@ -335,6 +308,8 @@ def algorithm(outlined_buildings=[], dropdownValue='By Demand', battery_efficien
         B_savings.loc[i,'Income_PV_EC_B(€)']=locals()["Surpluses"+B_savings.loc[i,'Building']]/locals()["SurpluesEC_B"+B_savings.loc[i,'Building']]*locals()["Income_EC_B_total"+B_savings.loc[i,'Building']]
         B_savings.loc[i,'incomeEC_total']=locals()["Income_EC_total"+B_savings.loc[i,'Building']]
         B_savings.loc[i,'incomeEC_b_total']=locals()["Income_EC_B_total"+B_savings.loc[i,'Building']]
+        B_savings.loc[i,'PV_Power_W']=locals()["PV_Power_W"+B_savings.loc[i,'Building']]
+        B_savings.loc[i,'PV_Investment_€']=locals()["PV_Investment_€"+B_savings.loc[i,'Building']]
 
     B_savings.head(2)
 
@@ -458,40 +433,65 @@ def algorithm(outlined_buildings=[], dropdownValue='By Demand', battery_efficien
 
     EC_total.rename(index={0: 'Without BESS',1:'With BESS'},inplace=True)
 
-    # EC_total
-
     # EC_total.to_csv('EC_analysis_total.csv')
 
     # Figures
 
+    return create_figures(EC_total, B_savings, outlined_buildings)
+
+def create_figures(energy_consumption=None, buildings_savings=None, outlined_buildings=[]):
+    """
+    Create all figures needed for dashboard
+    """
+    if energy_consumption is None:
+        energy_consumption = pd.read_csv('viana_do_castelo/EC_analysis_total.csv', usecols=['SS RATIO(%)', 'SC RATIO(%)'])
+        energy_consumption.rename(index={0: 'Without BESS', 1:'With BESS'},inplace=True)
+    if buildings_savings is None:
+        buildings_savings = pd.read_csv('viana_do_castelo/EC_building_savings.csv', usecols=['Building', 'Ecost_base (€)', 'Ecost_SC (€)', 'Ecost_EC (€)', 'Ecost_EC_BESS (€)','PV_Power_W','PV_Investment_€'])
+        buildings_savings.set_index('Building')
+
     consumption_columns = ['SS RATIO(%)', 'SC RATIO(%)']
-    ec_figure = px.bar(EC_total[consumption_columns], barmode='group', height=850,title="Self-consumption and self-sufficiency")
+    ec_figure = px.bar(energy_consumption[consumption_columns], barmode='group', height=950,title="Self-consumption and self-sufficiency")
 
+    renamed_columns = {
+        'Ecost_base (€)': 'Custo de electricidade sem CE (€)',
+        'Ecost_SC (€)': 'Custo de electricidade com PV sem CE (€)',
+        'Ecost_EC (€)': 'Custo de electricidade com PV em CE (€)',
+        'Ecost_EC_BESS (€)': 'Custo de electricidade com PV e bateria em CE (€)'
+    }
 
-        # Ajuste do layout para aumentar o tamanho do texto
-    # ec_figure.update_layout(
-    #         title_font_size=30,   # Tamanho do título
-    #         xaxis_title_font_size=24,   # Tamanho do título do eixo x
-    #         yaxis_title_font_size=24,   # Tamanho do título do eixo y
-    #         xaxis_tickfont_size=18,     # Tamanho dos valores do eixo x
-    #         yaxis_tickfont_size=18      # Tamanho dos valores do eixo y
-    #         )
-
-    savings_columns = ['Ecost_base (€)', 'Ecost_SC (€)', 'Ecost_EC (€)', 'Ecost_EC_BESS (€)']
-    bs_figure = px.bar(B_savings, x='Building', y=savings_columns, barmode='group', height=850, title="Energy costs annually")
+    # Rename the columns in the DataFrame
+    B_savings_renamed = buildings_savings.rename(columns=renamed_columns)
     
-    # bs_figure.update_layout(
-    #         title_font_size=30,   # Tamanho do título
-    #         xaxis_title_font_size=24,   # Tamanho do título do eixo x
-    #         yaxis_title_font_size=24,   # Tamanho do título do eixo y
-    #         xaxis_tickfont_size=18,     # Tamanho dos valores do eixo x
-    #         yaxis_tickfont_size=18,
-    #         legend_font_size=16        # Tamanho do texto da legenda
-    #         )   
+    bs_figure = px.bar(
+        B_savings_renamed,
+        x='Building',
+        y=list(renamed_columns.values()),
+        barmode='group',
+        height=950,
+        title="Energy costs annually"
+    )
 
-    map_figure = create_map(outlined_buildings, B_savings)    
+    pv_columns = {
+        'PV_Power_W': 'Potência do sistema fotovoltaico (W)',
+        'PV_Investment_€': 'Investimento do sistema fotovoltaico (€)'
+    }
 
-    return map_figure, ec_figure, bs_figure
+    # Rename the columns in the DataFrame
+    B_savings_renamed = buildings_savings.rename(columns=pv_columns)
+
+    PV_figure = px.bar(
+        B_savings_renamed,
+        x='Building',
+        y=list(pv_columns.values()),
+        barmode='group',
+        height=950,
+        title="PV Power and Investment"
+    )
+
+    map_figure = create_map(outlined_buildings, buildings_savings)
+
+    return map_figure, ec_figure, bs_figure, PV_figure
 
 def interpolate_color(value, colormap=plasma_colormap):
     """
