@@ -8,7 +8,9 @@ from algorithm import algorithm, create_map
 mapbox_api_token = os.getenv("MAPBOX_ACCESS_TOKEN")
 map = create_map()
 
-app = Dash(__name__, external_stylesheets=[dbc.themes.MINTY])
+app = Dash(__name__, 
+    meta_tags=[{"name": "viewport", "content": "width=device-width, initial-scale=1.0"}],
+    external_stylesheets=[dbc.themes.MINTY])
 
 tooltip = {"html": "<b>Building:</b> {Name} <br /><b>Ecost_base (€):</b> {Ecost_base (€)} <br /><b>Ecost_SC (€):</b> {Ecost_SC (€)} <br /><b>Ecost_EC_BESS (€):</b> {Ecost_EC_BESS (€)}"}
 
@@ -37,7 +39,7 @@ app.layout = dbc.Container([
                 dbc.Col(dbc.Button('Run Algorithm', color="primary", id='run-button'))
             ]),
             html.Br(),
-            # # Mapa
+            # 3d map
             dcc.Loading(
                 type='graph',
                 children=dash_deck.DeckGL(
@@ -48,6 +50,18 @@ app.layout = dbc.Container([
                     enableEvents=['click'],
                     style={"width": "45vw", "height": "60vh", "position": "relative", "zIndex": "0"}
                 )
+            ),
+            # 2d map
+            dcc.Loading(
+                dcc.Loading(type='graph', children=dcc.Graph(id='2d-map'))
+            ),
+            dbc.Card([dbc.CardHeader(id='building-details-title', children="Building Details"),
+            dbc.CardBody(
+                id='building-customization-fields',
+                children=[],  # Dynamically populated
+            )],
+            id='building-details-card',
+            style={"display": "none", "position": "fixed", "top": "10%", "right": "5%", "width": "25%"}
             ),
             # Segundo gráfico (abaixo do mapa) com margem superior
             dbc.Row(
@@ -80,6 +94,7 @@ app.layout = dbc.Container([
 
 @callback(
     Output('3d-map', 'data'),
+    Output('2d-map', 'figure'),
     Output('consumption-figure', 'figure'),
     Output('savings-figure', 'figure'),
     Output('PV-figure', 'figure'),
@@ -134,6 +149,40 @@ def update_building_outlines(click_info, previous_data):
 
     result = create_map(outlined_buildings=outlined_buildings, previous_layer=extruded_layer)
     return result
+
+@callback(
+    Output('building-details-card', 'style'),  # Control card visibility
+    Output('building-details-title', 'children'),  # Title for the card
+    Output('building-customization-fields', 'children'),  # Fields inside the card
+    Input('2d-map', 'selectedData'),  # Detect clicks on the 2D map
+    State('building-details-card', 'style'),  # Card visibility
+)
+def show_building_customization(selected_data, card_style):
+    # If a building is clicked
+    if selected_data and selected_data.get("points"):
+        fields = [dbc.Row([
+            dbc.Col(),
+            dbc.Col(html.Label("% de área de cobertura com PV")),
+            dbc.Col(html.Label("Carregamento de veículo electrico"))
+        ])]
+        for point in selected_data["points"]:
+            building_info = point.get("customdata", {})
+            print(building_info)
+            building_name = next((x for x in building_info if isinstance(x, str)), None)
+
+            # Populate the customization fields with building information
+            fields.append(
+                dbc.Row([
+                    dbc.Col(html.Label(building_name)),
+                    dbc.Col(dbc.Input(type="number", placeholder=100, min=0, max=100, step=1)),
+                    dbc.Col(dbc.Select(options=[{"label": "Yes", "value": "yes"}, {"label": "No", "value": "no"}], placeholder="No"))
+                ]))
+        # Add save changes button to the end
+        fields.append(dbc.Button("Save Changes", id="save-building-customization", color="primary"))
+        # Make card visible and populate with fields
+        return {"display": "block"}, "Selected Buildings", fields
+    # Hide the card if no building is clicked
+    return {"display": "none"}, "", []
 
 if __name__ == '__main__':
     app.run(debug=True)

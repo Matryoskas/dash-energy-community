@@ -489,9 +489,30 @@ def create_figures(energy_consumption=None, buildings_savings=None, outlined_bui
         title="PV Power and Investment"
     )
 
-    map_figure = create_map(outlined_buildings, buildings_savings)
+    if buildings_savings is None:
+        buildings_savings = pd.read_csv('viana_do_castelo/EC_building_savings.csv', usecols=['Building', 'Ecost_base (€)', 'Ecost_SC (€)', 'Ecost_EC (€)', 'Ecost_EC_BESS (€)'])
+    buildings_savings.set_index('Building')
+    buildings_shapefile = gpd.read_file('viana_do_castelo/zone.shp')
+    gdf = buildings_shapefile.merge(buildings_savings,left_on='Name', right_on='Building',how='right')
+    gdf = gdf.to_crs(epsg=4326)
 
-    return map_figure, ec_figure, bs_figure, PV_figure
+    map2d_figure = px.choropleth_mapbox(
+        gdf,
+        geojson=gdf.geometry,
+        locations=gdf.index,
+        color='Ecost_base (€)',
+        hover_data={'Building','Ecost_base (€)','Ecost_SC (€)', 'Ecost_EC_BESS (€)'},
+        center={'lat': 41.68307857293268, 'lon': -8.821966245912416},  
+        mapbox_style='open-street-map',
+        zoom=16,
+        width=1000,
+        height=1300,
+        title= "Annual Energy Cost (select a building set to run an EC analysis)"
+    )
+
+    map3d_figure = create_map(gdf, outlined_buildings)
+
+    return map3d_figure, map2d_figure, ec_figure, bs_figure, PV_figure
 
 def interpolate_color(value, colormap=plasma_colormap):
     """
@@ -520,13 +541,13 @@ def interpolate_color(value, colormap=plasma_colormap):
     color = (1 - t) * color1 + t * color2
     return [int(c) for c in color]
 
-def create_map(outlined_buildings=[], buildings_savings=None, previous_layer=None):
-    if buildings_savings is None:
+def create_map(gdf=None, outlined_buildings=[], previous_layer=None):
+    if gdf is None:
         buildings_savings = pd.read_csv('viana_do_castelo/EC_building_savings.csv', usecols=['Building', 'Ecost_base (€)', 'Ecost_SC (€)', 'Ecost_EC (€)', 'Ecost_EC_BESS (€)'])
-    buildings_savings.set_index('Building')
-    buildings_shapefile = gpd.read_file('viana_do_castelo/zone.shp')
-    gdf = buildings_shapefile.merge(buildings_savings,left_on='Name', right_on='Building',how='right')
-    gdf = gdf.to_crs(epsg=4326)
+        buildings_savings.set_index('Building')
+        buildings_shapefile = gpd.read_file('viana_do_castelo/zone.shp')
+        gdf = buildings_shapefile.merge(buildings_savings,left_on='Name', right_on='Building',how='right')
+        gdf = gdf.to_crs(epsg=4326)
 
     gdf['fill_color'] = (gdf['Ecost_base (€)'] - gdf['Ecost_base (€)'].min()) / (gdf['Ecost_base (€)'].max() - gdf['Ecost_base (€)'].min()) # normalize cost between 0-1
     gdf['fill_color'] = gdf['fill_color'].apply(interpolate_color)
@@ -581,7 +602,7 @@ def create_map(outlined_buildings=[], buildings_savings=None, previous_layer=Non
     map = pdk.Deck(
         [extruded_layer, outline_layer],  # Stack the layers
         initial_view_state=view_state,
-        map_style=pdk.map_styles.DARK,
+        map_style=pdk.map_styles.LIGHT,
     )
 
     return map.to_json()
