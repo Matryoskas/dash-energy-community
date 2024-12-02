@@ -1,4 +1,5 @@
-from dash import Dash, html, dcc, callback, Output, Input, State, ctx
+from dash import Dash, html, dcc, callback, Output, Input, State, ctx, ALL
+from dash.exceptions import PreventUpdate
 import dash_deck
 import os
 import json
@@ -10,11 +11,13 @@ map = create_map()
 
 app = Dash(__name__, 
     meta_tags=[{"name": "viewport", "content": "width=device-width, initial-scale=1.0"}],
-    external_stylesheets=[dbc.themes.MINTY])
+    external_stylesheets=[dbc.themes.MINTY],
+    suppress_callback_exceptions=True)
 
 tooltip = {"html": "<b>Building:</b> {Name} <br /><b>Ecost_base (€):</b> {Ecost_base (€)} <br /><b>Ecost_SC (€):</b> {Ecost_SC (€)} <br /><b>Ecost_EC_BESS (€):</b> {Ecost_EC_BESS (€)}"}
 
 app.layout = dbc.Container([
+    dcc.Store(id='buildings-info-store'),
     html.Br(),
     html.H1(children='Comunidade de Energia - análise de um bairro em Viana do Castelo', style={'textAlign': 'center'}),
     html.Br(),
@@ -156,33 +159,98 @@ def update_building_outlines(click_info, previous_data):
     Output('building-customization-fields', 'children'),  # Fields inside the card
     Input('2d-map', 'selectedData'),  # Detect clicks on the 2D map
     State('building-details-card', 'style'),  # Card visibility
+    State('buildings-info-store', 'data')  # Get stored building data
 )
-def show_building_customization(selected_data, card_style):
+def show_building_customization(selected_data, card_style, stored_data):
     # If a building is clicked
     if selected_data and selected_data.get("points"):
+        # Convert stored data to a dictionary for easier lookup
+        data_dict = {building['building_name']: building for building in (stored_data or [])}
+
         fields = [dbc.Row([
             dbc.Col(),
             dbc.Col(html.Label("% de área de cobertura com PV")),
-            dbc.Col(html.Label("Carregamento de veículo electrico"))
+            dbc.Col(html.Label("Carregamento de veículo elétrico"))
         ])]
-        for point in selected_data["points"]:
+
+        for i, point in enumerate(selected_data["points"]):
             building_info = point.get("customdata", {})
-            print(building_info)
             building_name = next((x for x in building_info if isinstance(x, str)), None)
+
+            # Check if building data exists in stored data
+            default_pv = data_dict.get(building_name, {}).get('area_coverage_pv', 100)
+            default_ev = data_dict.get(building_name, {}).get('ev_charging', 'no')
 
             # Populate the customization fields with building information
             fields.append(
                 dbc.Row([
-                    dbc.Col(html.Label(building_name)),
-                    dbc.Col(dbc.Input(type="number", placeholder=100, min=0, max=100, step=1)),
-                    dbc.Col(dbc.Select(options=[{"label": "Yes", "value": "yes"}, {"label": "No", "value": "no"}], placeholder="No"))
-                ]))
+                    dbc.Col(html.Label(building_name), id={'type': 'building-name', 'index': i}),
+                    dbc.Col(dbc.Input(
+                        type="number", 
+                        id={'type': 'building-pv-input', 'index': i}, 
+                        value=default_pv
+                    )),
+                    dbc.Col(dbc.Select(
+                        options=[
+                            {"label": "Sim", "value": "yes"}, 
+                            {"label": "Não", "value": "no"}
+                        ],
+                        id={'type': 'building-ev-select', 'index': i}, 
+                        value=default_ev
+                    ))
+                ])
+            )
+
         # Add save changes button to the end
-        fields.append(dbc.Button("Save Changes", id="save-building-customization", color="primary"))
+        fields.append(dbc.Button("Save Changes", id="save-buildings-customization", color="primary"))
+
         # Make card visible and populate with fields
         return {"display": "block"}, "Selected Buildings", fields
+
     # Hide the card if no building is clicked
     return {"display": "none"}, "", []
+
+@callback(
+    Output('buildings-info-store', 'data'),
+    Input('save-buildings-customization', 'n_clicks'),
+    State('buildings-info-store', 'data'),
+    State({'type': 'building-name', 'index': ALL}, 'children'),
+    State({'type': 'building-pv-input', 'index': ALL}, 'value'),
+    State({'type': 'building-ev-select', 'index': ALL}, 'value'),
+    prevent_initial_call=True
+)
+def save_building_info(n_clicks, existing_data, building_names, pv_values, ev_values):
+    if not n_clicks:
+        raise PreventUpdate
+
+    # Initialize storage if it does not exist
+    if existing_data is None:
+        existing_data = []
+
+    # Create a dictionary for easier lookup
+    data_dict = {building['building_name']: building for building in existing_data}
+
+    # Update or add buildings
+    for name, pv, ev in zip(building_names, pv_values, ev_values):
+        # Extract the label text from the children property
+        if isinstance(name, dict) and 'props' in name and 'children' in name['props']:
+            name = name['props']['children']
+
+        # Update if exists, otherwise add
+        if name in data_dict:
+            data_dict[name]['area_coverage_pv'] = pv
+            data_dict[name]['ev_charging'] = ev
+        else:
+            data_dict[name] = {
+                'building_name': name,
+                'area_coverage_pv': pv,
+                'ev_charging': ev
+            }
+
+    # Convert back to a list and return
+    updated_data = list(data_dict.values())
+    print("Updated Buildings Data:", updated_data)
+    return updated_data
 
 if __name__ == '__main__':
     app.run(debug=True)
