@@ -105,9 +105,10 @@ app.layout = dbc.Container([
     State('battery-efficiency', 'value'),
     State('dropdown', 'value'),
     Input('run-button', 'n_clicks'),
-    Input('reset-button', 'n_clicks')
+    Input('reset-button', 'n_clicks'),
+    State('buildings-info-store', 'data')
 )
-def update_map(batt_eff, value, run_button, reset_button):
+def update_map(batt_eff, value, run_button, reset_button, buildings_update):
     if (ctx.triggered_id == 'reset-button'):
         print('reset')
         return algorithm() + ('By Demand',)
@@ -115,7 +116,7 @@ def update_map(batt_eff, value, run_button, reset_button):
     print('update')
     outlined_buildings = getattr(update_building_outlines, 'outlined_buildings', [])
     print(outlined_buildings)
-    return algorithm(outlined_buildings, value, batt_eff)+ (value,)
+    return algorithm(outlined_buildings, value, batt_eff, buildings_update)+ (value,)
 
 @callback(
     Output('3d-map', 'data', allow_duplicate=True),
