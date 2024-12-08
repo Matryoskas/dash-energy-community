@@ -28,18 +28,19 @@ def algorithm(outlined_buildings=[], dropdownValue='By Demand', battery_efficien
 
     dataframes_final = [dataframe for dataframe in dataframes_final if dataframe.at[0, 'Name'] in outlined_buildings]
 
-    for building_update in buildings_update:
-        building_name = building_update['building_name']
-        area_coverage_pv = building_update['area_coverage_pv']
-        ev_charging = building_update['ev_charging']
-        for df in dataframes_final:
-            if df['Name'].iloc[0] == building_name:
-                print('Changing building', building_name)
-                # Multiply the values in the specified columns
-                df['E_PV_gen_kWh'] *= area_coverage_pv / 100
-                df['PV_Investment_€'] *= area_coverage_pv / 100
-                df['PV_Power_W'] *= area_coverage_pv / 100
-                break
+    if buildings_update:
+        for building_update in buildings_update:
+            building_name = building_update['building_name']
+            area_coverage_pv = building_update['area_coverage_pv']
+            ev_charging = building_update['ev_charging']
+            for df in dataframes_final:
+                if df['Name'].iloc[0] == building_name:
+                    print('Changing building', building_name)
+                    # Multiply the values in the specified columns
+                    df['E_PV_gen_kWh'] *= area_coverage_pv / 100
+                    df['PV_Investment_€'] *= area_coverage_pv / 100
+                    df['PV_Power_W'] *= area_coverage_pv / 100
+                    break
 
     dff=dataframes_final[0] # example of calling the first dataframe from the list
     EC = dff[["Date"]].copy() # create a dataframe with only the first column by copying it

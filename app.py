@@ -18,6 +18,7 @@ tooltip = {"html": "<b>Building:</b> {Name} <br /><b>Ecost_base (€):</b> {Ecos
 
 app.layout = dbc.Container([
     dcc.Store(id='buildings-info-store'),
+    dcc.Store(id='save-status-store', data={'status': 'idle'}),
     html.Br(),
     html.H1(children='Comunidade de Energia - análise de um bairro em Viana do Castelo', style={'textAlign': 'center'}),
     html.Br(),
@@ -206,13 +207,14 @@ def show_building_customization(selected_data, card_style, stored_data):
         fields.append(dbc.Button("Save Changes", id="save-buildings-customization", color="primary"))
 
         # Make card visible and populate with fields
-        return {"display": "block"}, "Selected Buildings", fields
+        return {"display": "block"}, "Edifícios Selecionados", fields
 
     # Hide the card if no building is clicked
     return {"display": "none"}, "", []
 
 @callback(
     Output('buildings-info-store', 'data'),
+    Output('save-status-store', 'data'),
     Input('save-buildings-customization', 'n_clicks'),
     State('buildings-info-store', 'data'),
     State({'type': 'building-name', 'index': ALL}, 'children'),
@@ -231,27 +233,57 @@ def save_building_info(n_clicks, existing_data, building_names, pv_values, ev_va
     # Create a dictionary for easier lookup
     data_dict = {building['building_name']: building for building in existing_data}
 
+    # Define default values
+    default_pv = 100
+    default_ev = 'no'
+
     # Update or add buildings
     for name, pv, ev in zip(building_names, pv_values, ev_values):
         # Extract the label text from the children property
         if isinstance(name, dict) and 'props' in name and 'children' in name['props']:
             name = name['props']['children']
 
-        # Update if exists, otherwise add
+        # If the building already exists, update it
         if name in data_dict:
             data_dict[name]['area_coverage_pv'] = pv
             data_dict[name]['ev_charging'] = ev
         else:
-            data_dict[name] = {
-                'building_name': name,
-                'area_coverage_pv': pv,
-                'ev_charging': ev
-            }
+            # Only add new buildings if their values are not default
+            if pv != default_pv or ev != default_ev:
+                data_dict[name] = {
+                    'building_name': name,
+                    'area_coverage_pv': pv,
+                    'ev_charging': ev
+                }
 
     # Convert back to a list and return
     updated_data = list(data_dict.values())
     print("Updated Buildings Data:", updated_data)
-    return updated_data
+    return updated_data, {'status': 'saved'}
+
+@callback(
+    Output('save-buildings-customization', 'children'),
+    Input('save-status-store', 'data'),
+    prevent_initial_call=True
+)
+def update_save_button_text(save_status):
+    if save_status['status'] == 'saved':
+        # Return "Saved!" with a checkmark
+        return html.Span(["✔ Saved!"])
+    # Default text
+    return "Save Changes"
+
+@callback(
+    Output('save-status-store', 'data', allow_duplicate=True),
+    Input('save-status-store', 'data'),
+    prevent_initial_call=True
+)
+def reset_save_status(save_status):
+    if save_status['status'] == 'saved':
+        import time
+        time.sleep(2)  # Wait for 2 seconds before resetting
+        return {'status': 'idle'}
+    return save_status
 
 if __name__ == '__main__':
     app.run(debug=True)
