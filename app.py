@@ -172,7 +172,7 @@ def show_building_customization(selected_data, card_style, stored_data):
         fields = [dbc.Row([
             dbc.Col(),
             dbc.Col(html.Label("% de área de cobertura com PV")),
-            dbc.Col(html.Label("Carregamento de veículo elétrico"))
+            dbc.Col(html.Label("Número de veículos elétricos"))
         ])]
 
         for i, point in enumerate(selected_data["points"]):
@@ -181,22 +181,22 @@ def show_building_customization(selected_data, card_style, stored_data):
 
             # Check if building data exists in stored data
             default_pv = data_dict.get(building_name, {}).get('area_coverage_pv', 100)
-            default_ev = data_dict.get(building_name, {}).get('ev_charging', 'no')
+            default_ev = data_dict.get(building_name, {}).get('ev_charging', 0)
 
             # Populate the customization fields with building information
             fields.append(
                 dbc.Row([
                     dbc.Col(html.Label(building_name), id={'type': 'building-name', 'index': i}),
                     dbc.Col(dbc.Input(
-                        type="number", 
-                        id={'type': 'building-pv-input', 'index': i}, 
+                        type="number",
+                        min=0,
+                        max=100,
+                        id={'type': 'building-pv-input', 'index': i},
                         value=default_pv
                     )),
-                    dbc.Col(dbc.Select(
-                        options=[
-                            {"label": "Sim", "value": "yes"}, 
-                            {"label": "Não", "value": "no"}
-                        ],
+                    dbc.Col(dbc.Input(
+                        type="number",
+                        min=0,
                         id={'type': 'building-ev-select', 'index': i}, 
                         value=default_ev
                     ))
@@ -235,7 +235,7 @@ def save_building_info(n_clicks, existing_data, building_names, pv_values, ev_va
 
     # Define default values
     default_pv = 100
-    default_ev = 'no'
+    default_ev = 0
 
     # Update or add buildings
     for name, pv, ev in zip(building_names, pv_values, ev_values):
