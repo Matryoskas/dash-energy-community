@@ -33,6 +33,7 @@ def algorithm(outlined_buildings=[], dropdownValue='By Demand', battery_efficien
             building_name = building_update['building_name']
             area_coverage_pv = building_update['area_coverage_pv']
             ev_charging = building_update['ev_charging']
+            
             for df in dataframes_final:
                 if df['Name'].iloc[0] == building_name:
                     print('Changing building', building_name)
@@ -40,13 +41,19 @@ def algorithm(outlined_buildings=[], dropdownValue='By Demand', battery_efficien
                     df['E_PV_gen_kWh'] *= area_coverage_pv / 100
                     df['PV_Investment_€'] *= area_coverage_pv / 100
                     df['PV_Power_W'] *= area_coverage_pv / 100
+                    df['GRID_total_kWh'] = df['GRID_kWh'] + df['GRID_v_kWh'] * ev_charging
                     break
+        
+        # Add GRID_total_kWh column to all other dataframes
+        for df in dataframes_final:
+            if 'GRID_total_kWh' not in df.columns:
+                df['GRID_total_kWh'] = df['GRID_kWh']
 
     dff=dataframes_final[0] # example of calling the first dataframe from the list
     EC = dff[["Date"]].copy() # create a dataframe with only the first column by copying it
 
     for dataframe_final in dataframes_final: # loop on the several building files (dataframes) to perform the operations 
-        dataframe_final['Enet1_'+dataframe_final["Name"][0]]=dataframe_final['GRID_kWh']-dataframe_final['E_PV_gen_kWh'] # give the name of the building and perform the calculation 
+        dataframe_final['Enet1_'+dataframe_final["Name"][0]]=dataframe_final['GRID_total_kWh']-dataframe_final['E_PV_gen_kWh'] # give the name of the building and perform the calculation 
         EC['Enet1_'+dataframe_final["Name"][0]]=dataframe_final['Enet1_'+dataframe_final["Name"][0]] # consider the previous columns on just one dataframe
 
     EC=EC.set_index("Date") #set date as index (not a column)
@@ -58,7 +65,7 @@ def algorithm(outlined_buildings=[], dropdownValue='By Demand', battery_efficien
     EC_dem_gen= dff2[["Date"]].copy() # create a dataframe with only the first column by copying it
 
     for dataframe_final in dataframes_final: # loop on the several building files (dataframes) to perform the operations 
-        dataframe_final['Edem_'+dataframe_final["Name"][0]]=dataframe_final['GRID_kWh']
+        dataframe_final['Edem_'+dataframe_final["Name"][0]]=dataframe_final['GRID_total_kWh']
         EC_dem_gen['Edem_'+dataframe_final["Name"][0]]=dataframe_final['Edem_'+dataframe_final["Name"][0]]
         dataframe_final['Egen_'+dataframe_final["Name"][0]]=dataframe_final['E_PV_gen_kWh']
         EC_dem_gen['Egen_'+dataframe_final["Name"][0]]=dataframe_final['Egen_'+dataframe_final["Name"][0]]
@@ -276,7 +283,7 @@ def algorithm(outlined_buildings=[], dropdownValue='By Demand', battery_efficien
     # dataframes_final4[0].to_csv('EC_d1bfinal.csv')
 
     for dataframe_final in dataframes_final4:
-        dataframe_final['Cost_base']=dataframe_final['GRID_kWh']*dataframe_final['Tariff_base']
+        dataframe_final['Cost_base']=dataframe_final['GRID_total_kWh']*dataframe_final['Tariff_base']
         dataframe_final['Cost_SC'] = dataframe_final['Enet1_'+dataframe_final["Name"][0]]*dataframe_final['Tariff_self_cons']
         dataframe_final['Cost_EC']=dataframe_final['Egrid_'+dataframe_final["Name"][0]]*dataframe_final['Tariff_EC']
         dataframe_final['Cost_EC_BESS']=dataframe_final['EgridBESS_'+dataframe_final["Name"][0]]*dataframe_final['Tariff_EC_BESS']
@@ -374,13 +381,13 @@ def algorithm(outlined_buildings=[], dropdownValue='By Demand', battery_efficien
         locals()["EC_"+ str(dataframe_final["Name"][0])]= dataframe_final['Enet1_'+dataframe_final["Name"][0]].agg(lambda x : x[x > 0].sum())
         locals()["Egrid_"+ str(dataframe_final["Name"][0])]= dataframe_final['Egrid_'+dataframe_final["Name"][0]].agg(lambda x : x.sum())
         locals()["ECgridBESS_"+ str(dataframe_final["Name"][0])]= dataframe_final['EgridBESS_'+dataframe_final["Name"][0]].agg(lambda x : x.sum())
-        locals()["GRID_kWh_"+ str(dataframe_final["Name"][0])]= dataframe_final['GRID_kWh'].agg(lambda x : x.sum())
+        locals()["GRID_total_kWh_"+ str(dataframe_final["Name"][0])]= dataframe_final['GRID_total_kWh'].agg(lambda x : x.sum())
         
         locals()["PV_gen(kWh/year)_"+ str(dataframe_final["Name"][0])]= dataframe_final['E_PV_gen_kWh'].agg(lambda x : x.sum())
         locals()["SURPLUS_"+ str(dataframe_final["Name"][0])]= abs(dataframe_final['Enet1_'+dataframe_final["Name"][0]].agg(lambda x : x[x < 0].sum()))
         locals()["Self_consumed_energy_"+ str(dataframe_final["Name"][0])]=  locals()["PV_gen(kWh/year)_"+ str(dataframe_final["Name"][0])]-locals()["SURPLUS_"+ str(dataframe_final["Name"][0])]
         #demand
-        locals()["Demand_"+ str(dataframe_final["Name"][0])]= dataframe_final['GRID_kWh'].agg(lambda x : x.sum())
+        locals()["Demand_"+ str(dataframe_final["Name"][0])]= dataframe_final['GRID_total_kWh'].agg(lambda x : x.sum())
 
 
     for i in range(len(EC_analysis)):
@@ -389,13 +396,13 @@ def algorithm(outlined_buildings=[], dropdownValue='By Demand', battery_efficien
         EC_analysis.loc[i,'PV_gen(kWh/year)']=locals()["PV_gen(kWh/year)_"+EC_analysis.loc[i,'Building']]
         
         EC_analysis.loc[i,'SELFCONS (kWh/year)']=locals()["EC_"+EC_analysis.loc[i,'Building']]
-        EC_analysis.loc[i,'SELFCONS (SS RATIO)']=1-EC_analysis.loc[i,'SELFCONS (kWh/year)']/locals()["GRID_kWh_"+EC_analysis.loc[i,'Building']]
+        EC_analysis.loc[i,'SELFCONS (SS RATIO)']=1-EC_analysis.loc[i,'SELFCONS (kWh/year)']/locals()["GRID_total_kWh_"+EC_analysis.loc[i,'Building']]
         
         EC_analysis.loc[i,'EC_SHARING (kWh/year)']=locals()["Egrid_"+EC_analysis.loc[i,'Building']]
-        EC_analysis.loc[i,'EC_SHARING (SS RATIO)']= 1-EC_analysis.loc[i,'EC_SHARING (kWh/year)']/locals()["GRID_kWh_"+EC_analysis.loc[i,'Building']]
+        EC_analysis.loc[i,'EC_SHARING (SS RATIO)']= 1-EC_analysis.loc[i,'EC_SHARING (kWh/year)']/locals()["GRID_total_kWh_"+EC_analysis.loc[i,'Building']]
         
         EC_analysis.loc[i,'EC_BESS (kWh/year)']=locals()["ECgridBESS_"+EC_analysis.loc[i,'Building']]
-        EC_analysis.loc[i,'EC_BESS (SS RATIO)']=1- EC_analysis.loc[i,'EC_BESS (kWh/year)']/locals()["GRID_kWh_"+EC_analysis.loc[i,'Building']]
+        EC_analysis.loc[i,'EC_BESS (SS RATIO)']=1- EC_analysis.loc[i,'EC_BESS (kWh/year)']/locals()["GRID_total_kWh_"+EC_analysis.loc[i,'Building']]
         
 
         EC_analysis.loc[i,'Self_consumed_energy (kWh/year)']=locals()["Self_consumed_energy_"+EC_analysis.loc[i,'Building']]
