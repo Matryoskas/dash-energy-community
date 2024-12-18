@@ -18,7 +18,7 @@ def algorithm(outlined_buildings=[], dropdownValue='By Demand', battery_efficien
     if not outlined_buildings:
         return create_figures()
 
-    csvfiles_final = glob2.glob(os.path.join('./viana_do_castelo', 'B*[0-9]_final.csv')) # paths for the building files
+    csvfiles_final = glob2.glob(os.path.join('./oeiras', 'B*[0-9]_final.csv')) # paths for the building files
 
     dataframes_final = [] #empty list
     for csvfile_final in csvfiles_final:
@@ -465,10 +465,10 @@ def create_figures(energy_consumption=None, buildings_savings=None, outlined_bui
     Create all figures needed for dashboard
     """
     if energy_consumption is None:
-        energy_consumption = pd.read_csv('viana_do_castelo/EC_analysis_total.csv', usecols=['SS RATIO(%)', 'SC RATIO(%)'])
+        energy_consumption = pd.read_csv('oeiras/EC_analysis_total.csv', usecols=['SS RATIO(%)', 'SC RATIO(%)'])
         energy_consumption.rename(index={0: 'Without BESS', 1:'With BESS'},inplace=True)
     if buildings_savings is None:
-        buildings_savings = pd.read_csv('viana_do_castelo/EC_building_savings.csv', usecols=['Building', 'Ecost_base (€)', 'Ecost_SC (€)', 'Ecost_EC (€)', 'Ecost_EC_BESS (€)','PV_Power_W','PV_Investment_€'])
+        buildings_savings = pd.read_csv('oeiras/EC_building_savings.csv', usecols=['Building', 'Ecost_base (€)', 'Ecost_SC (€)', 'Ecost_EC (€)', 'Ecost_EC_BESS (€)','PV_Power_W','PV_Investment_€'])
         buildings_savings.set_index('Building')
 
     consumption_columns = ['SS RATIO(%)', 'SC RATIO(%)']
@@ -511,9 +511,9 @@ def create_figures(energy_consumption=None, buildings_savings=None, outlined_bui
     )
 
     if buildings_savings is None:
-        buildings_savings = pd.read_csv('viana_do_castelo/EC_building_savings.csv', usecols=['Building', 'Ecost_base (€)', 'Ecost_SC (€)', 'Ecost_EC (€)', 'Ecost_EC_BESS (€)'])
+        buildings_savings = pd.read_csv('oeiras/EC_building_savings.csv', usecols=['Building', 'Ecost_base (€)', 'Ecost_SC (€)', 'Ecost_EC (€)', 'Ecost_EC_BESS (€)'])
     buildings_savings.set_index('Building')
-    buildings_shapefile = gpd.read_file('viana_do_castelo/zone.shp')
+    buildings_shapefile = gpd.read_file('oeiras/zone.shp')
     gdf = buildings_shapefile.merge(buildings_savings,left_on='Name', right_on='Building',how='right')
     gdf = gdf.to_crs(epsg=4326)
 
@@ -570,9 +570,9 @@ def interpolate_color(value, colormap=plasma_colormap):
 
 def create_map(gdf=None, outlined_buildings=[], previous_layer=None):
     if gdf is None:
-        buildings_savings = pd.read_csv('viana_do_castelo/EC_building_savings.csv', usecols=['Building', 'Ecost_base (€)', 'Ecost_SC (€)', 'Ecost_EC (€)', 'Ecost_EC_BESS (€)'])
+        buildings_savings = pd.read_csv('oeiras/EC_building_savings.csv', usecols=['Building', 'Ecost_base (€)', 'Ecost_SC (€)', 'Ecost_EC (€)', 'Ecost_EC_BESS (€)'])
         buildings_savings.set_index('Building')
-        buildings_shapefile = gpd.read_file('viana_do_castelo/zone.shp')
+        buildings_shapefile = gpd.read_file('oeiras/zone.shp')
         gdf = buildings_shapefile.merge(buildings_savings,left_on='Name', right_on='Building',how='right')
         gdf = gdf.to_crs(epsg=4326)
 
