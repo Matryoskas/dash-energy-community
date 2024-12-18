@@ -517,20 +517,26 @@ def create_figures(energy_consumption=None, buildings_savings=None, outlined_bui
     gdf = buildings_shapefile.merge(buildings_savings,left_on='Name', right_on='Building',how='right')
     gdf = gdf.to_crs(epsg=4326)
 
+    # Calculate the centroid (mean center) of the GeoDataFrame
+    gdf_centroid = gdf.geometry.centroid
+
+    # Get the mean latitude and longitude
+    center_lat = gdf_centroid.y.mean()
+    center_lon = gdf_centroid.x.mean()
+
     map2d_figure = px.choropleth_mapbox(
         gdf,
         geojson=gdf.geometry,
         locations=gdf.index,
         color='Ecost_base (€)',
         hover_data={'Building','Ecost_base (€)','Ecost_SC (€)', 'Ecost_EC_BESS (€)'},
-        center={'lat': 41.68307857293268, 'lon': -8.821966245912416},  
+        center={'lat': center_lat, 'lon': center_lon},
         mapbox_style='open-street-map',
         zoom=16,
         width=1000,
         height=1300,
-        title= "Annual Energy Cost (select a building set to run an EC analysis)"
+        title="Annual Energy Cost (select a building set to run an EC analysis)"
     )
-
     map3d_figure = create_map(gdf, outlined_buildings)
 
     return map3d_figure, map2d_figure, ec_figure, bs_figure, PV_figure
@@ -577,10 +583,17 @@ def create_map(gdf=None, outlined_buildings=[], previous_layer=None):
     gdf['line_color'] = gdf.apply(
         lambda row: [255, 0, 0, 255] if row['Building'] in outlined_buildings else [255, 255, 255, 255], axis=1
     )
+    # Calculate the centroid (mean center) of the GeoDataFrame
+    gdf_centroid = gdf.geometry.centroid
+
+    # Get the mean latitude and longitude
+    center_lat = gdf_centroid.y.mean()
+    center_lon = gdf_centroid.x.mean()
+
     view_state = pdk.ViewState(
         **{
-            "latitude": 41.68307857293268,
-            "longitude": -8.821966245912416,
+            "latitude": center_lat,
+            "longitude": center_lon,
             "zoom": 16,
             "maxZoom": 20,
             "pitch": 45,
