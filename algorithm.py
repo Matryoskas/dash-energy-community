@@ -44,10 +44,10 @@ def algorithm(outlined_buildings=[], dropdownValue='By Demand', battery_efficien
                     df['GRID_total_kWh'] = df['GRID_kWh'] + df['GRID_v_kWh'] * ev_charging
                     break
         
-        # Add GRID_total_kWh column to all other dataframes
-        for df in dataframes_final:
-            if 'GRID_total_kWh' not in df.columns:
-                df['GRID_total_kWh'] = df['GRID_kWh']
+    # Add GRID_total_kWh column to all other dataframes
+    for df in dataframes_final:
+        if 'GRID_total_kWh' not in df.columns:
+            df['GRID_total_kWh'] = df['GRID_kWh']
 
     dff=dataframes_final[0] # example of calling the first dataframe from the list
     EC = dff[["Date"]].copy() # create a dataframe with only the first column by copying it

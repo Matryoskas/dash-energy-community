@@ -6,59 +6,82 @@ import json
 import dash_bootstrap_components as dbc
 from algorithm import algorithm, create_map
 
+# Get your Mapbox API token from the environment
 mapbox_api_token = os.getenv("MAPBOX_ACCESS_TOKEN")
-map = create_map()
+# Create the initial map (without any building selection)
+map_initial = create_map()
 
-app = Dash(__name__, 
-    meta_tags=[{"name": "viewport", "content": "width=device-width, initial-scale=1.0"}],
-    external_stylesheets=[dbc.themes.MINTY],
-    suppress_callback_exceptions=True)
+# Initialize the app with a Bootstrap stylesheet
+app = Dash(__name__, external_stylesheets=[dbc.themes.MINTY])
+app.title = "Comunidade de Energia"
 
-tooltip = {"html": "<b>Building:</b> {Name} <br /><b>Ecost_base (€):</b> {Ecost_base (€)} <br /><b>Ecost_SC (€):</b> {Ecost_SC (€)} <br /><b>Ecost_EC_BESS (€):</b> {Ecost_EC_BESS (€)}"}
+# Tooltip configuration for the map
+tooltip = {
+    "html": (
+        "<b>Building:</b> {Name} <br />"
+        "<b>Ecost_base (€):</b> {Ecost_base (€)} <br />"
+        "<b>Ecost_SC (€):</b> {Ecost_SC (€)} <br />"
+        "<b>Ecost_EC_BESS (€):</b> {Ecost_EC_BESS (€)}"
+    )
+}
 
-app.layout = dbc.Container([
+# ------------------------------
+# Define the layout for the "Map" page.
+# ------------------------------
+layout_map = dbc.Container([
     dcc.Store(id='buildings-info-store'),
     dcc.Store(id='save-status-store', data={'status': 'idle'}),
     html.Br(),
-    html.H1(children='Comunidade de Energia - análise de um bairro em Viana do Castelo', style={'textAlign': 'center'}),
+    html.H1("Mapa e Controlos", style={'textAlign': 'center'}),
     html.Br(),
-    html.P("Dashboard que permite seleccionar um conjunto de edifícios participantes de uma Comunidade de Energia (CE) apresentando indicadores sobre a sua performance.",
-        style={'textAlign': 'left', 'fontSize': '25px'}),
-    html.P("No mapa seleccione os edifícios participantes de uma comunidade de energia. Poderá seleccionar a capacidade de armazenamento do sistema de bateria e o método de distribuição do excedent de produção de electricidade por PV.",
-        style={'textAlign': 'left', 'fontSize': '25px'}),
-    html.P("A capacidade da bateria varia entre 0-1, sendo que 1 corresponde a um dia de consumo médio da comunidade seleccionada. O excedente no momento i poderá ser distribuido por: 'Demand' consumo de energia dos edíficios participantes da comunidade no momento i ou 'Electricity production' pela electricidade produzida anualmente por participante.",
-        style={'textAlign': 'left', 'fontSize': '25px'}),
-    html.P("Indicadores apresentados: 'self-consumption', 'self-sufficiency', Custos anuais de electricidade (€), Potência (W) e Investimento (€) no sistema de PV.",
-        style={'textAlign': 'left', 'fontSize': '25px'}),
-    html.Hr(),
+    html.P(
+        "Seleciona os edifícios para participar na comunidade de energia, escolhe "
+        "a capacidade da bateria e o método para distribuir o excedente solar.",
+        style={'textAlign': 'center', 'fontSize': '20px'}
+    ),
+    html.Br(),
     dbc.Row([
-        # Primeira coluna: Configurações e Mapa
         dbc.Col([
-            html.P("Distribuição do excedente solar", style={'textAlign': 'left', 'fontSize': '25px'}),
+            html.P("Distribuição do excedente solar", style={'fontSize': '20px'}),
+            dcc.Dropdown(
+                ['By Demand', 'By Electricity Production'],
+                'By Demand',
+                id='dropdown',
+                clearable=False
+            ),
             html.Br(),
-            dbc.Row(dcc.Dropdown(['By Demand', 'By Electricity Production'], 'By Demand', id='dropdown')),
+            html.P(
+                "Capacidade da Bateria (1 = 1x a média diária de consumo)",
+                style={'fontSize': '20px'}
+            ),
+            dcc.Input(
+                id='battery-efficiency',
+                type='number',
+                value=1,
+                min=0,
+                max=1,
+                step=0.1,
+                placeholder='Eficiência da bateria'
+            ),
             html.Br(),
-            # Botões de execução e reset
-            dbc.Row([
-                dbc.Col(dbc.Button('Run Algorithm', color="primary", id='run-button'))
-            ]),
             html.Br(),
-            # 3d map
             dcc.Loading(
-                type='graph',
+                type='default',
                 children=dash_deck.DeckGL(
-                    map,
+                    map_initial,
                     id="3d-map",
                     mapboxKey=mapbox_api_token,
                     tooltip=tooltip,
                     enableEvents=['click'],
-                    style={"width": "45vw", "height": "60vh", "position": "relative", "zIndex": "0"}
+                    style={"width": "100%", "height": "60vh", "position": "relative", "zIndex": "0"}
                 )
             ),
-            # 2d map
-            dcc.Loading(
-                dcc.Loading(type='graph', children=dcc.Graph(id='2d-map'))
-            ),
+            dbc.Button('Correr algoritmo', color="primary", id='run-button'),
+            html.Span("    "),
+            dbc.Button('Reset', color="secondary", id='reset-button'),
+        ], width=6),
+        dbc.Col([
+            dcc.Loading(type='graph', children=dcc.Graph(id='2d-map')),
             dbc.Card([dbc.CardHeader(id='building-details-title', children="Building Details"),
             dbc.CardBody(
                 id='building-customization-fields',
@@ -66,58 +89,121 @@ app.layout = dbc.Container([
             )],
             id='building-details-card',
             style={"display": "none", "position": "fixed", "top": "10%", "right": "5%", "width": "25%"}
-            ),
-            # Segundo gráfico (abaixo do mapa) com margem superior
-            dbc.Row(
-                dcc.Loading(type='graph', children=dcc.Graph(id='PV-figure')),
-                style={"width": "100%", "height": "50vh"}
             )
-        ], width=6),  # Define metade da largura para esta coluna
-        # Segunda coluna: Configurações da Bateria e Gráficos
-        dbc.Col([
-            html.P("Capacidade da Bateria (1 =1x capacidade = média diária de consumo eléctrico do edifício)",
-                   style={'textAlign': 'left', 'fontSize': '25px'}),
-            html.Br(),
-            # Input de capacidade da bateria
-            dbc.Row(dcc.Input(id='battery-efficiency', type='number', value=1, min=0, max=1, step=0.1, placeholder='Eficiência da bateria')),
-            html.Br(),
-            # Botões de execução e reset
-            dbc.Row([
-                dbc.Col(dbc.Button('Reset', color="primary", id='reset-button'))
-            ]),
-            # Primeiro gráfico na coluna direita
-            dbc.Row(
-                dcc.Loading(type='graph', children=dcc.Graph(id='consumption-figure')),style={"width": "100%", "height": "50vh"}),
-            html.Br(),
-            # Segundo gráfico na coluna direita
-            dbc.Row(dcc.Loading(type='graph', children=dcc.Graph(id='savings-figure')),style={"width": "100%", "height": "50vh"}),
-            html.Br(),
-        ], width=6)  # Define metade da largura para esta coluna
+        ], width=4)
     ])
 ], fluid=True)
 
+# ------------------------------
+# Define the layout for the "Data Analysis" page.
+# ------------------------------
+layout_analysis = dbc.Container([
+    html.Br(),
+    html.H1("Análise de Dados", style={'textAlign': 'center'}),
+    html.Br(),
+    html.P(
+        "As seguintes figuras mostram os indicadores de performance: "
+        "self-consumption, self-sufficiency, annual electricity cost (€), "
+        "PV power (W) e investment (€).",
+        style={'textAlign': 'center', 'fontSize': '20px'}
+    ),
+    html.Br(),
+    dbc.Row([
+        dbc.Col(
+            dcc.Loading(type='default', children=dcc.Graph(id='savings-figure')),
+            width=12
+        )
+    ]),
+    html.Br(),
+    dbc.Row([
+        dbc.Col(
+            dcc.Loading(type='default', children=dcc.Graph(id='PV-figure')),
+        ),
+        dbc.Col(
+           dcc.Loading(type='default', children=dcc.Graph(id='consumption-figure')),
+        )
+    ])
+], fluid=True)
+
+# ------------------------------
+# Define the main app layout with a Navbar and a Location component.
+# ------------------------------
+app.layout = html.Div([
+    dcc.Location(id='url', refresh=False),
+    dbc.NavbarSimple(
+        children=[
+            dbc.NavItem(dcc.Link("Mapa", href="/map", className="nav-link")),
+            dbc.NavItem(dcc.Link("Análise de Dados", href="/analysis", className="nav-link"))
+        ],
+        brand="Comunidade de Energia",
+        color="primary",
+        dark=True,
+        sticky="top"
+    ),
+    # A hidden Store component to hold the analysis figures (so they can be shared across pages)
+    dcc.Store(id='analysis-data'),
+    html.Div(id='page-content')
+])
+
+# ------------------------------
+# Callback to route between pages
+# ------------------------------
+@callback(
+    Output('page-content', 'children'),
+    Input('url', 'pathname')
+)
+def display_page(pathname):
+    if pathname == '/analysis':
+        return layout_analysis
+    # Default page (or if pathname == '/map')
+    return layout_map
+
+# ------------------------------
+# Callback to update the map and run the algorithm.
+#
+# This callback is triggered by the "Run Algorithm" or "Reset" buttons.
+# It outputs:
+#   - Updated data for the 3D map (Deck.GL)
+#   - A dictionary containing the three analysis figures stored in 'analysis-data'
+#   - The current value of the dropdown (for consistency)
+# ------------------------------
 @callback(
     Output('3d-map', 'data'),
     Output('2d-map', 'figure'),
-    Output('consumption-figure', 'figure'),
-    Output('savings-figure', 'figure'),
-    Output('PV-figure', 'figure'),
+    Output('analysis-data', 'data'),
     Output('dropdown', 'value'),
     State('battery-efficiency', 'value'),
     State('dropdown', 'value'),
     Input('run-button', 'n_clicks'),
     Input('reset-button', 'n_clicks'),
-    State('buildings-info-store', 'data')
+    State('buildings-info-store', 'data'),
+    prevent_initial_call=True
 )
-def update_map(batt_eff, value, run_button, reset_button, buildings_update):
-    if (ctx.triggered_id == 'reset-button'):
-        print('reset')
-        return algorithm() + ('By Demand',)
-
-    print('update')
-    outlined_buildings = getattr(update_building_outlines, 'outlined_buildings', [])
-    print(outlined_buildings)
-    return algorithm(outlined_buildings, value, batt_eff, buildings_update)+ (value,)
+def update_map(batt_eff, current_dropdown, run_button, reset_button, buildings_update):
+    # When reset is triggered, clear selections and revert to defaults
+    if ctx.triggered_id == 'reset-button':
+        print('Resetting...')
+        # Clear any building outlines (this attribute is stored on the update_building_outlines function)
+        update_building_outlines.outlined_buildings = []
+        # Call your algorithm without building selections
+        map3d_data, map2d_data, cons_fig, sav_fig, pv_fig = algorithm()
+        analysis_data = {
+            'consumption': cons_fig,
+            'savings': sav_fig,
+            'pv': pv_fig
+        }
+        return map3d_data, map2d_data, analysis_data, 'By Demand'
+    else:
+        # When running the algorithm normally, use the current building selections.
+        outlined_buildings = getattr(update_building_outlines, 'outlined_buildings', [])
+        print("Buildings selected:", outlined_buildings)
+        map3d_data, map2d_data, cons_fig, sav_fig, pv_fig = algorithm(outlined_buildings, current_dropdown, batt_eff, buildings_update)
+        analysis_data = {
+            'consumption': cons_fig,
+            'savings': sav_fig,
+            'pv': pv_fig
+        }
+        return map3d_data, map2d_data, analysis_data, current_dropdown
 
 @callback(
     Output('3d-map', 'data', allow_duplicate=True),
@@ -284,6 +370,36 @@ def reset_save_status(save_status):
         time.sleep(2)  # Wait for 2 seconds before resetting
         return {'status': 'idle'}
     return save_status
+
+# ------------------------------
+# Callbacks to update the figures on the Data Analysis page by reading from the stored analysis data.
+# ------------------------------
+@callback(
+    Output('consumption-figure', 'figure'),
+    Input('analysis-data', 'data')
+)
+def update_consumption_figure(analysis_data):
+    if analysis_data is None:
+        return {}
+    return analysis_data.get('consumption', {})
+
+@callback(
+    Output('savings-figure', 'figure'),
+    Input('analysis-data', 'data')
+)
+def update_savings_figure(analysis_data):
+    if analysis_data is None:
+        return {}
+    return analysis_data.get('savings', {})
+
+@callback(
+    Output('PV-figure', 'figure'),
+    Input('analysis-data', 'data')
+)
+def update_PV_figure(analysis_data):
+    if analysis_data is None:
+        return {}
+    return analysis_data.get('pv', {})
 
 if __name__ == '__main__':
     app.run(debug=True)
