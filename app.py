@@ -4,12 +4,13 @@ import dash_deck
 import os
 import json
 import dash_bootstrap_components as dbc
-from algorithm import algorithm, create_map
+from algorithm import algorithm, create3d_map, create_2d_map
 
 # Get your Mapbox API token from the environment
 mapbox_api_token = os.getenv("MAPBOX_ACCESS_TOKEN")
 # Create the initial map (without any building selection)
-map_initial = create_map()
+map3d_initial = create3d_map()
+map2d_initial = create_2d_map()
 
 # Initialize the app with a Bootstrap stylesheet
 app = Dash(__name__, external_stylesheets=[dbc.themes.MINTY])
@@ -26,23 +27,62 @@ tooltip = {
 }
 
 # ------------------------------
+# Define the layout for the "Characterization" page.
+# ------------------------------
+layout_characterization = dbc.Container([
+        
+    dbc.Row([
+        html.H5("Caracterização dos edifícios", style={"fontWeight": "bold"}),
+        html.P(
+            "No mapa da direita é possível caracterizar os edifícios relativamente à área de PV em % da área de cobertura disponível "
+            "e ao número de carros eléctricos. Pode seleccionar os edifícios a caracterizar usando a ferramenta Lasso ou Box no canto "
+            "superior do mapa. Ao seleccionar, aparece um quadro com os edifícios seleccionados."
+        ),
+    ]),
+    dbc.Row([
+        dcc.Loading(type='graph', children=dcc.Graph(figure=map2d_initial, id='2d-map')),
+        dbc.Card([dbc.CardHeader(id='building-details-title', children="Building Details"),
+        dbc.CardBody(
+            id='building-customization-fields',
+            children=[],  # Dynamically populated
+        )],
+        id='building-details-card',
+        style={"display": "none", "position": "fixed", "top": "10%", "right": "5%", "width": "25%"}
+        )
+    ])
+])
+
+# ------------------------------
 # Define the layout for the "Map" page.
 # ------------------------------
 layout_map = dbc.Container([
-    dcc.Store(id='buildings-info-store'),
-    dcc.Store(id='save-status-store', data={'status': 'idle'}),
     html.Br(),
-    html.H1("Mapa e Controlos", style={'textAlign': 'center'}),
-    html.Br(),
-    html.P(
-        "Seleciona os edifícios para participar na comunidade de energia, escolhe "
-        "a capacidade da bateria e o método para distribuir o excedente solar.",
-        style={'textAlign': 'center', 'fontSize': '20px'}
-    ),
+    html.H1("Comunidade de Energia", style={'textAlign': 'center'}),
     html.Br(),
     dbc.Row([
         dbc.Col([
-            html.P("Distribuição do excedente solar", style={'fontSize': '20px'}),
+            html.H5("Seleção de edifícios", style={"fontWeight": "bold"}),
+            html.P(
+                "No mapa da esquerda é possível seleccionar quais os edifícios participantes de uma comunidade de energia. "
+                "Pode seleccionar um edifício individualmente e, utilizando a tecla Ctrl, é possível seleccionar vários edifícios. "
+                "A distribuição do excedente solar de produção de electricidade tem duas opções:"
+            ),
+            html.Ul([
+                html.Li("By demand - rasteio horário de acordo com o consumo de electricidade dos edifícios participantes."),
+                html.Li("Electricity Production - rateio horário segundo a produção anual estimada de PV.")
+            ]),
+            html.P(
+                "O dimensionamento da capacidade da bateria é calculado por: n x consumo médio diário dos edifícios participantes."
+            ),
+        ]),
+
+    ]),
+    html.Br(),
+
+    
+    dbc.Row([
+        dbc.Col([
+            html.P("Distribuição do excedente solar", style={'fontSize': '20px', 'color': '#009FE3'}),
             dcc.Dropdown(
                 ['By Demand', 'By Electricity Production'],
                 'By Demand',
@@ -52,7 +92,7 @@ layout_map = dbc.Container([
             html.Br(),
             html.P(
                 "Capacidade da Bateria (1 = 1x a média diária de consumo)",
-                style={'fontSize': '20px'}
+                style={'fontSize': '20px','color': '#009FE3'}
             ),
             dcc.Input(
                 id='battery-efficiency',
@@ -68,7 +108,7 @@ layout_map = dbc.Container([
             dcc.Loading(
                 type='default',
                 children=dash_deck.DeckGL(
-                    map_initial,
+                    map3d_initial,
                     id="3d-map",
                     mapboxKey=mapbox_api_token,
                     tooltip=tooltip,
@@ -79,18 +119,7 @@ layout_map = dbc.Container([
             dbc.Button('Correr algoritmo', color="primary", id='run-button'),
             html.Span("    "),
             dbc.Button('Reset', color="secondary", id='reset-button'),
-        ], width=6),
-        dbc.Col([
-            dcc.Loading(type='graph', children=dcc.Graph(id='2d-map')),
-            dbc.Card([dbc.CardHeader(id='building-details-title', children="Building Details"),
-            dbc.CardBody(
-                id='building-customization-fields',
-                children=[],  # Dynamically populated
-            )],
-            id='building-details-card',
-            style={"display": "none", "position": "fixed", "top": "10%", "right": "5%", "width": "25%"}
-            )
-        ], width=4)
+        ]),
     ])
 ], fluid=True)
 
@@ -99,10 +128,10 @@ layout_map = dbc.Container([
 # ------------------------------
 layout_analysis = dbc.Container([
     html.Br(),
-    html.H1("Análise de Dados", style={'textAlign': 'center'}),
+    html.H1("Análise de Resultados", style={'textAlign': 'center'}),
     html.Br(),
     html.P(
-        "As seguintes figuras mostram os indicadores de performance: "
+        "As seguintes figuras mostram os indicadores de performance da comunidade de energia seleccionada: "
         "self-consumption, self-sufficiency, annual electricity cost (€), "
         "PV power (W) e investment (€).",
         style={'textAlign': 'center', 'fontSize': '20px'}
@@ -125,6 +154,24 @@ layout_analysis = dbc.Container([
     ])
 ], fluid=True)
 
+
+# Página inicial com explicação
+layout_intro = dbc.Container([
+    html.Br(),
+    html.H1("Bem-vindo ao Dashboard da Comunidade de Energia", style={'textAlign': 'center'}),
+    html.Br(),
+    html.P(
+        "Este dashboard permite avaliar a performance de comunidade de energia (electricidade) de uma área urbana. "
+        "O dashboard tem três páginas: \"Caracterização\", \"Mapas\" e \"Análise de Resultados\".",
+        style={'textAlign': 'center', 'fontSize': '20px'}
+    ),
+    html.Br(),
+    html.Div(
+        dbc.Button("Entrar no Dashboard", color="primary", href="/characterization", size="lg"),
+        style={'textAlign': 'center'}
+    )
+], fluid=True)
+
 # ------------------------------
 # Define the main app layout with a Navbar and a Location component.
 # ------------------------------
@@ -132,16 +179,18 @@ app.layout = html.Div([
     dcc.Location(id='url', refresh=False),
     dbc.NavbarSimple(
         children=[
+            dbc.NavItem(dcc.Link("Caracterização", href="/characterization", className="nav-link")),
             dbc.NavItem(dcc.Link("Mapa", href="/map", className="nav-link")),
-            dbc.NavItem(dcc.Link("Análise de Dados", href="/analysis", className="nav-link"))
+            dbc.NavItem(dcc.Link("Análise de Resultados", href="/analysis", className="nav-link"))
         ],
-        brand="Comunidade de Energia",
         color="primary",
         dark=True,
         sticky="top"
     ),
-    # A hidden Store component to hold the analysis figures (so they can be shared across pages)
     dcc.Store(id='analysis-data'),
+    dcc.Store(id='buildings-info-store'),
+    dcc.Store(id='outlined-buildings-store', data=[]),
+    dcc.Store(id='save-status-store', data={'status': 'idle'}),
     html.Div(id='page-content')
 ])
 
@@ -155,8 +204,16 @@ app.layout = html.Div([
 def display_page(pathname):
     if pathname == '/analysis':
         return layout_analysis
-    # Default page (or if pathname == '/map')
-    return layout_map
+    elif pathname == '/map':
+        return layout_map
+    elif pathname == '/characterization':
+        return layout_characterization
+    # Página inicial
+    return layout_intro
+
+# ------------------------------
+# Map page callbacks
+# ------------------------------
 
 # ------------------------------
 # Callback to update the map and run the algorithm.
@@ -169,77 +226,80 @@ def display_page(pathname):
 # ------------------------------
 @callback(
     Output('3d-map', 'data'),
-    Output('2d-map', 'figure'),
     Output('analysis-data', 'data'),
     Output('dropdown', 'value'),
     State('battery-efficiency', 'value'),
     State('dropdown', 'value'),
+    State('outlined-buildings-store', 'data'),
+    State('buildings-info-store', 'data'),
     Input('run-button', 'n_clicks'),
     Input('reset-button', 'n_clicks'),
-    State('buildings-info-store', 'data'),
     prevent_initial_call=True
 )
-def update_map(batt_eff, current_dropdown, run_button, reset_button, buildings_update):
-    # When reset is triggered, clear selections and revert to defaults
+def update_map(batt_eff, current_dropdown, outlined_buildings, buildings_update, run_clicks, reset_clicks):
+    if (run_clicks is None or run_clicks == 0) and (reset_clicks is None or reset_clicks == 0):
+        raise PreventUpdate
+
     if ctx.triggered_id == 'reset-button':
-        print('Resetting...')
-        # Clear any building outlines (this attribute is stored on the update_building_outlines function)
-        update_building_outlines.outlined_buildings = []
-        # Call your algorithm without building selections
-        map3d_data, map2d_data, cons_fig, sav_fig, pv_fig = algorithm()
+        map3d_data, cons_fig, sav_fig, pv_fig = algorithm()
         analysis_data = {
             'consumption': cons_fig,
             'savings': sav_fig,
             'pv': pv_fig
         }
-        return map3d_data, map2d_data, analysis_data, 'By Demand'
-    else:
-        # When running the algorithm normally, use the current building selections.
-        outlined_buildings = getattr(update_building_outlines, 'outlined_buildings', [])
-        print("Buildings selected:", outlined_buildings)
-        map3d_data, map2d_data, cons_fig, sav_fig, pv_fig = algorithm(outlined_buildings, current_dropdown, batt_eff, buildings_update)
+        return map3d_data, analysis_data, 'By Demand'
+
+    if ctx.triggered_id == 'run-button':
+        map3d_data, cons_fig, sav_fig, pv_fig = algorithm(
+            outlined_buildings,
+            current_dropdown,
+            batt_eff,
+            buildings_update
+        )
         analysis_data = {
             'consumption': cons_fig,
             'savings': sav_fig,
             'pv': pv_fig
         }
-        return map3d_data, map2d_data, analysis_data, current_dropdown
+        return map3d_data, analysis_data, current_dropdown
+
+    raise PreventUpdate
+
 
 @callback(
-    Output('3d-map', 'data', allow_duplicate=True),
+    Output('outlined-buildings-store', 'data'),
     Input('3d-map', 'clickInfo'),
-    State('3d-map', 'data'),
+    State('outlined-buildings-store', 'data'),
     prevent_initial_call=True
 )
-def update_building_outlines(click_info, previous_data):
-    # Track selected buildings using a hidden state
-    outlined_buildings = getattr(update_building_outlines, 'outlined_buildings', [])
+def update_outlined_buildings(click_info, current_outlined):
+    if current_outlined is None:
+        current_outlined = []
 
     if click_info is not None:
         clicked_building = click_info.get('object', {}).get('Name', None)
-        print('clicked building: ', clicked_building)
         if clicked_building:
-            if clicked_building in outlined_buildings:
-                # If building is already selected, deselect it
-                outlined_buildings.remove(clicked_building)
+            if clicked_building in current_outlined:
+                current_outlined.remove(clicked_building)
             else:
-                # Add clicked building to the selection
-                outlined_buildings.append(clicked_building)
-    # Store selected buildings back to the hidden state
-    update_building_outlines.outlined_buildings = outlined_buildings
-    
-    print('outlined buildings: ', outlined_buildings)
+                current_outlined.append(clicked_building)
 
+    return current_outlined
+
+@callback(
+    Output('3d-map', 'data', allow_duplicate=True),
+    Input('outlined-buildings-store', 'data'),
+    State('3d-map', 'data'),
+    prevent_initial_call=True
+)
+def render_outlined_buildings(outlined_buildings, previous_data):
     previous_data = json.loads(previous_data)
+    extruded_layer = next(layer for layer in previous_data.get("layers", []) if layer['id'] == "extruded-layer")
+    return create3d_map(outlined_buildings=outlined_buildings, previous_layer=extruded_layer)
 
-    # Ensure the layers are correctly accessed
-    layers = previous_data.get("layers", [])
-    
-    # Extract the current extruded layer from the existing layers
-    extruded_layer = next(layer for layer in layers if layer['id'] == "extruded-layer")
-
-    result = create_map(outlined_buildings=outlined_buildings, previous_layer=extruded_layer)
-    return result
+# ------------------------------
+# Characterization page callbacks
+# ------------------------------
 
 @callback(
     Output('building-details-card', 'style'),  # Control card visibility

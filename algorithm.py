@@ -462,7 +462,7 @@ def algorithm(outlined_buildings=[], dropdownValue='By Demand', battery_efficien
 
 def create_figures(energy_consumption=None, buildings_savings=None, outlined_buildings=[]):
     """
-    Create all figures needed for dashboard
+    Create figures needed for map and analysis pages
     """
     if energy_consumption is None:
         energy_consumption = pd.read_csv('torres/EC_analysis_total.csv', usecols=['SS RATIO(%)', 'SC RATIO(%)'])
@@ -517,29 +517,9 @@ def create_figures(energy_consumption=None, buildings_savings=None, outlined_bui
     gdf = buildings_shapefile.merge(buildings_savings,left_on='Name', right_on='Building',how='right')
     gdf = gdf.to_crs(epsg=4326)
 
-    # Calculate the centroid (mean center) of the GeoDataFrame
-    gdf_centroid = gdf.geometry.centroid
+    map3d_figure = create3d_map(gdf, outlined_buildings)
 
-    # Get the mean latitude and longitude
-    center_lat = gdf_centroid.y.mean()
-    center_lon = gdf_centroid.x.mean()
-
-    map2d_figure = px.choropleth_mapbox(
-        gdf,
-        geojson=gdf.geometry,
-        locations=gdf.index,
-        color='Ecost_base (€)',
-        hover_data={'Building','Ecost_base (€)','Ecost_SC (€)', 'Ecost_EC_BESS (€)'},
-        center={'lat': center_lat, 'lon': center_lon},
-        mapbox_style='open-street-map',
-        zoom=16.5,
-        width=1000,
-        height=1300,
-        title="Annual Energy Cost (select a building set to run an EC analysis)"
-    )
-    map3d_figure = create_map(gdf, outlined_buildings)
-
-    return map3d_figure, map2d_figure, ec_figure, bs_figure, PV_figure
+    return map3d_figure, ec_figure, bs_figure, PV_figure
 
 def interpolate_color(value, colormap=plasma_colormap):
     """
@@ -568,7 +548,7 @@ def interpolate_color(value, colormap=plasma_colormap):
     color = (1 - t) * color1 + t * color2
     return [int(c) for c in color]
 
-def create_map(gdf=None, outlined_buildings=[], previous_layer=None):
+def create3d_map(gdf=None, outlined_buildings=[], previous_layer=None):
     if gdf is None:
         buildings_savings = pd.read_csv('torres/EC_building_savings.csv', usecols=['Building', 'Ecost_base (€)', 'Ecost_SC (€)', 'Ecost_EC (€)', 'Ecost_EC_BESS (€)'])
         buildings_savings.set_index('Building')
@@ -640,3 +620,36 @@ def create_map(gdf=None, outlined_buildings=[], previous_layer=None):
     )
 
     return map.to_json()
+
+def create_2d_map():
+    """
+    Create 2d map
+    """
+    buildings_savings = pd.read_csv('torres/EC_building_savings.csv', usecols=['Building', 'Ecost_base (€)', 'Ecost_SC (€)', 'Ecost_EC (€)', 'Ecost_EC_BESS (€)'])
+    buildings_savings.set_index('Building')
+    buildings_shapefile = gpd.read_file('torres/zone.shp')
+    gdf = buildings_shapefile.merge(buildings_savings,left_on='Name', right_on='Building',how='right')
+    gdf = gdf.to_crs(epsg=4326)
+
+    # Calculate the centroid (mean center) of the GeoDataFrame
+    gdf_centroid = gdf.geometry.centroid
+
+    # Get the mean latitude and longitude
+    center_lat = gdf_centroid.y.mean()
+    center_lon = gdf_centroid.x.mean()
+
+    map2d_figure = px.choropleth_mapbox(
+        gdf,
+        geojson=gdf.geometry,
+        locations=gdf.index,
+        color='Ecost_base (€)',
+        hover_data={'Building','Ecost_base (€)','Ecost_SC (€)', 'Ecost_EC_BESS (€)'},
+        center={'lat': center_lat, 'lon': center_lon},
+        mapbox_style='open-street-map',
+        zoom=16.5,
+        width=1000,
+        height=1300,
+        title="Annual Energy Cost (select a building set to run an EC analysis)"
+    )
+    
+    return map2d_figure
