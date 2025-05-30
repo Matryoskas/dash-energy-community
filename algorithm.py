@@ -32,7 +32,8 @@ def algorithm(outlined_buildings=[], dropdownValue='By Demand', battery_efficien
         for building_update in buildings_update:
             building_name = building_update['building_name']
             area_coverage_pv = building_update['area_coverage_pv']
-            ev_charging = building_update['ev_charging']
+            ev_charging_day = building_update['ev_charging_day']
+            ev_charging_night = building_update['ev_charging_night']
             
             for df in dataframes_final:
                 if df['Name'].iloc[0] == building_name:
@@ -41,7 +42,9 @@ def algorithm(outlined_buildings=[], dropdownValue='By Demand', battery_efficien
                     df['E_PV_gen_kWh'] *= area_coverage_pv / 100
                     df['PV_Investment_€'] *= area_coverage_pv / 100
                     df['PV_Power_W'] *= area_coverage_pv / 100
-                    df['GRID_total_kWh'] = df['GRID_kWh'] + df['GRID_v_kWh'] * ev_charging
+                    df['GRID_total_kWh'] = df['GRID_kWh'] + df['GRID_v_kWh'] * ev_charging_day
+                    if 'GRID_v_nocturno_kWh' in df.columns:
+                       df['GRID_total_kWh'] += df['GRID_v_nocturno_kWh'] * ev_charging_night
                     break
         
     # Add GRID_total_kWh column to all other dataframes

@@ -318,7 +318,8 @@ def show_building_customization(selected_data, card_style, stored_data):
         fields = [dbc.Row([
             dbc.Col(),
             dbc.Col(html.Label("% de área de cobertura com PV")),
-            dbc.Col(html.Label("Número de veículos elétricos"))
+            dbc.Col(html.Label("Nº de veículos elétricos com carregamento diurno")),
+            dbc.Col(html.Label("Nº de veículos elétricos com carregamento noturno"))
         ])]
 
         for i, point in enumerate(selected_data["points"]):
@@ -327,7 +328,8 @@ def show_building_customization(selected_data, card_style, stored_data):
 
             # Check if building data exists in stored data
             default_pv = data_dict.get(building_name, {}).get('area_coverage_pv', 100)
-            default_ev = data_dict.get(building_name, {}).get('ev_charging', 0)
+            default_ev_day = data_dict.get(building_name, {}).get('ev_charging_day', 0)
+            default_ev_night = data_dict.get(building_name, {}).get('ev_charging_night', 0)
 
             # Populate the customization fields with building information
             fields.append(
@@ -343,8 +345,14 @@ def show_building_customization(selected_data, card_style, stored_data):
                     dbc.Col(dbc.Input(
                         type="number",
                         min=0,
-                        id={'type': 'building-ev-select', 'index': i}, 
-                        value=default_ev
+                        id={'type': 'building-ev-day-select', 'index': i}, 
+                        value=default_ev_day
+                    )),
+                    dbc.Col(dbc.Input(
+                        type="number",
+                        min=0,
+                        id={'type': 'building-ev-night-select', 'index': i}, 
+                        value=default_ev_night
                     ))
                 ])
             )
@@ -365,10 +373,11 @@ def show_building_customization(selected_data, card_style, stored_data):
     State('buildings-info-store', 'data'),
     State({'type': 'building-name', 'index': ALL}, 'children'),
     State({'type': 'building-pv-input', 'index': ALL}, 'value'),
-    State({'type': 'building-ev-select', 'index': ALL}, 'value'),
+    State({'type': 'building-ev-day-select', 'index': ALL}, 'value'),
+    State({'type': 'building-ev-night-select', 'index': ALL}, 'value'),
     prevent_initial_call=True
 )
-def save_building_info(n_clicks, existing_data, building_names, pv_values, ev_values):
+def save_building_info(n_clicks, existing_data, building_names, pv_values, ev_day_values, ev_night_values):
     if not n_clicks:
         raise PreventUpdate
 
@@ -384,7 +393,7 @@ def save_building_info(n_clicks, existing_data, building_names, pv_values, ev_va
     default_ev = 0
 
     # Update or add buildings
-    for name, pv, ev in zip(building_names, pv_values, ev_values):
+    for name, pv, ev_day, ev_night in zip(building_names, pv_values, ev_day_values, ev_night_values):
         # Extract the label text from the children property
         if isinstance(name, dict) and 'props' in name and 'children' in name['props']:
             name = name['props']['children']
@@ -392,14 +401,16 @@ def save_building_info(n_clicks, existing_data, building_names, pv_values, ev_va
         # If the building already exists, update it
         if name in data_dict:
             data_dict[name]['area_coverage_pv'] = pv
-            data_dict[name]['ev_charging'] = ev
+            data_dict[name]['ev_charging_day'] = ev_day
+            data_dict[name]['ev_charging_night'] = ev_night
         else:
             # Only add new buildings if their values are not default
-            if pv != default_pv or ev != default_ev:
+            if pv != default_pv or ev_day != default_ev or ev_night != default_ev:
                 data_dict[name] = {
                     'building_name': name,
                     'area_coverage_pv': pv,
-                    'ev_charging': ev
+                    'ev_charging_day': ev_day,
+                    'ev_charging_night': ev_night
                 }
 
     # Convert back to a list and return
