@@ -30,15 +30,26 @@ tooltip = {
 # Define the layout for the "Characterization" page.
 # ------------------------------
 layout_characterization = dbc.Container([
-        
+     html.Br(),
+     html.Br(),
     dbc.Row([
         html.H5("Caracterização dos edifícios", style={"fontWeight": "bold"}),
         html.P(
-            "No mapa da direita é possível caracterizar os edifícios relativamente à área de PV em % da área de cobertura disponível "
-            "e ao número de carros eléctricos. Pode seleccionar os edifícios a caracterizar usando a ferramenta Lasso ou Box no canto "
-            "superior do mapa. Ao seleccionar, aparece um quadro com os edifícios seleccionados."
-        ),
+            "No mapa é possível caracterizar os edifícios relativamente à área de painel solar fotovoltaico (*) em % da área de cobertura disponível "
+            "e ao número de carros eléctricos **. Seleccione os edifícios a caracterizar usando a ferramenta Lasso ou Box no canto "
+            "superior do mapa, e irá aparecer um quadro. Se não quiser alterar a caracterização, avance para Seleção."
+                    ),
     ]),
+    
+    html.Br(),
+    html.Div([
+        html.Img(src='/assets/lasso select.jpg', style={'width': '10%', 'marginRight': '2px'}),
+        html.Img(src='/assets/box select.jpg', style={'width': '10%'})
+    ], style={'display': 'flex', 'justifyContent': 'center'}),
+    html.Br(),
+
+
+    
     dbc.Row([
         dcc.Loading(type='graph', children=dcc.Graph(figure=map2d_initial, id='2d-map')),
         dbc.Card([dbc.CardHeader(id='building-details-title', children="Building Details"),
@@ -49,38 +60,49 @@ layout_characterization = dbc.Container([
         id='building-details-card',
         style={"display": "none", "position": "fixed", "top": "10%", "right": "5%", "width": "25%"}
         )
-    ])
+    ]),
+    dbc.Row([
+        html.P(
+            "* Os painéis solares fotovoltaicos estão instalados segundo a inclinação optimizada para a maior produção anual," 
+            "definida pelo software de modelação City Energy Analyst"
+                    ),
+        html.P(
+            "** É considerado que os veículos eléctricos carregam diariamente durante a noite"
+                    )
+    ]),
+   
 ])
 
+
 # ------------------------------
-# Define the layout for the "Map" page.
+# Define the layout for the "Seleção" page.
 # ------------------------------
 layout_map = dbc.Container([
     html.Br(),
-    html.H1("Comunidade de Energia", style={'textAlign': 'center'}),
     html.Br(),
     dbc.Row([
-        dbc.Col([
-            html.H5("Seleção de edifícios", style={"fontWeight": "bold"}),
-            html.P(
-                "No mapa da esquerda é possível seleccionar quais os edifícios participantes de uma comunidade de energia. "
-                "Pode seleccionar um edifício individualmente e, utilizando a tecla Ctrl, é possível seleccionar vários edifícios. "
-                "A distribuição do excedente solar de produção de electricidade tem duas opções:"
-            ),
-            html.Ul([
-                html.Li("By demand - rasteio horário de acordo com o consumo de electricidade dos edifícios participantes."),
-                html.Li("Electricity Production - rateio horário segundo a produção anual estimada de PV.")
-            ]),
-            html.P(
-                "O dimensionamento da capacidade da bateria é calculado por: n x consumo médio diário dos edifícios participantes."
-            ),
-        ]),
+        #dbc.Col([
+        html.H5("Seleção de edifícios", style={"fontWeight": "bold"}),
+        html.P(
+                "No mapa  é possível seleccionar quais os edifícios participantes de uma Comunidade de Energia. "
+                "É possível seleccionar um edifício individualmente e, utilizando a tecla Ctrl, é possível seleccionar vários edifícios. "
+                "A distribuição do excedente solar de produção de electricidade considera duas opções: "),
+  
+        html.P(
+                " - By demand - rateio horário de acordo com o consumo de electricidade dos edifícios participantes."
+                ),
+                       
+        html.P(
+                " - By Electricity Production - rateio horário segundo a produção anual estimada de PV."
+                        ,                        
+                        style={'textAlign': 'left'}),
+        html.P(
+                "O dimensionamento da capacidade da bateria é calculado por: n x consumo médio diário dos edifícios participantes." ,style={'textAlign': 'left'}),
+        ])
+    ,
 
-    ]),
-    html.Br(),
-
-    
-    dbc.Row([
+ 
+   dbc.Row([
         dbc.Col([
             html.P("Distribuição do excedente solar", style={'fontSize': '20px', 'color': '#009FE3'}),
             dcc.Dropdown(
@@ -121,21 +143,27 @@ layout_map = dbc.Container([
             dbc.Button('Reset', color="secondary", id='reset-button'),
         ]),
     ])
-], fluid=True)
+]
+    #, fluid=True
+    )
 
 # ------------------------------
 # Define the layout for the "Data Analysis" page.
 # ------------------------------
 layout_analysis = dbc.Container([
     html.Br(),
-    html.H1("Análise de Resultados", style={'textAlign': 'center'}),
     html.Br(),
+    html.H5("Análise de Resultados", style={'textAlign': 'left',"fontWeight": "bold"}),
     html.P(
-        "As seguintes figuras mostram os indicadores de performance da comunidade de energia seleccionada: "
-        "self-consumption, self-sufficiency, annual electricity cost (€), "
-        "PV power (W) e investment (€).",
-        style={'textAlign': 'center', 'fontSize': '20px'}
-    ),
+        "As figuras seguintes mostram indicadores de performance da comunidade de energia seleccionada: ",style={'textAlign': 'left'}),
+      
+    html.P(    
+        "- Custo anual de electricidade (€) sem comunidade de energia (CE); edifícios com painéis fotovoltaico (PV) e sem CE; com PV e em CE; com PV em CE e armazenamento"),
+    html.P(
+        "- Potência de painéis solares fotovoltaicos instalada (W) e investimento (€)",style={'textAlign': 'left'}),     
+    html.P(    
+    "- Auto-consumo (SC) e Auto-suficiência (SS) da comunidade, sem ou com armazenamento de electricidade"),
+    
     html.Br(),
     dbc.Row([
         dbc.Col(
@@ -147,45 +175,94 @@ layout_analysis = dbc.Container([
     dbc.Row([
         dbc.Col(
             dcc.Loading(type='default', children=dcc.Graph(id='PV-figure')),
-        ),
-        dbc.Col(
-           dcc.Loading(type='default', children=dcc.Graph(id='consumption-figure')),
+            width=12
         )
-    ])
-], fluid=True)
+    ]),
+    html.Br(),
+    dbc.Row([
+        dbc.Col(
+            dcc.Loading(type='default', children=dcc.Graph(id='consumption-figure')),
+            width=12
+        )
+    ]),
 
+]
+    #, fluid=True
+    )
 
 # Página inicial com explicação
 layout_intro = dbc.Container([
     html.Br(),
-    html.H1("Bem-vindo ao Dashboard da Comunidade de Energia", style={'textAlign': 'center'}),
     html.Br(),
-    html.P(
-        "Este dashboard permite avaliar a performance de comunidade de energia (electricidade) de uma área urbana. "
-        "O dashboard tem três páginas: \"Caracterização\", \"Mapas\" e \"Análise de Resultados\".",
-        style={'textAlign': 'center', 'fontSize': '20px'}
+    html.H4("EC+ Energia em Comunidade", style={'textAlign': 'center', "fontWeight": "bold"}),
+    html.H5("Análise da performance de Comunidades de Energia", style={'textAlign': 'center', "fontWeight": "bold"}),
+    html.Br(),
+
+    dbc.Row([
+        dbc.Col([
+            html.H6("O que é uma Comunidade de Energia?"),
+            html.P("Uma Comunidade de Energia é um conjunto de edifícios — como habitações, escolas ou serviços — "
+                   "que partilham entre si a eletricidade produzida localmente, geralmente através de painéis solares "
+                   "fotovoltaicos instalados nas coberturas. Esta partilha permite reduzir os custos com energia, "
+                   "aumentar a autonomia energética e promover a descarbonização do consumo de electricidade."),
+
+            html.H6("Quais são os principais desafios?"),
+            html.P("A criação de uma Comunidade de Energia envolve várias decisões importantes:"),
+            html.Ul([
+                html.Li("Que edifícios devem participar?"),
+                html.Li("Quanta electricidade solar pode ser gerada em cada cobertura?"),
+                html.Li("Vale a pena instalar baterias? E com que capacidade?")
+            ]),
+            html.P("Estes desafios exigem uma análise cuidada dos dados de consumo, produção e investimento."),
+
+            html.P("O dashboard EC+ Energia em Comunidade permite avaliar a performance de uma comunidade de energia "
+                   "seleccionada dentro de uma área urbana com partilha de electricidade produzida localmente por painéis "
+                   "solares fotovoltaicos. O dashboard utiliza dados horários, à escala do edifício, de consumo e de "
+                   "produção de electricidade e tem três páginas: \"Caracterização\", \"Seleção\" e \"Análise de Resultados\".")
+        ], width=7),
+
+        dbc.Col([
+            html.Img(src='/assets/imagem_PV_VE.jpg', style={
+                'width': '50%', 'height': 'auto', 'borderRadius': '8px'
+            })
+        ], width=5)
+    ]),
+
+    html.Br(),
+    html.Div(
+        html.Img(src='/assets/dados.jpg', style={'width': '1000px', 'display': 'block', 'margin': '0 auto'}),
     ),
+    html.Br(),
     html.Br(),
     html.Div(
         dbc.Button("Entrar no Dashboard", color="primary", href="/characterization", size="lg"),
         style={'textAlign': 'center'}
     )
-], fluid=True)
+])
+
+
+
+
+
+
 
 # ------------------------------
 # Define the main app layout with a Navbar and a Location component.
 # ------------------------------
 app.layout = html.Div([
     dcc.Location(id='url', refresh=False),
-    dbc.NavbarSimple(
-        children=[
-            dbc.NavItem(dcc.Link("Caracterização", href="/characterization", className="nav-link")),
-            dbc.NavItem(dcc.Link("Mapa", href="/map", className="nav-link")),
-            dbc.NavItem(dcc.Link("Análise de Resultados", href="/analysis", className="nav-link"))
-        ],
-        color="primary",
-        dark=True,
-        sticky="top"
+    dbc.Navbar(
+    dbc.Container([
+        dbc.NavbarBrand("EC+ Energia em Comunidade", href="/", className="me-auto"),
+        dbc.Nav([
+            dbc.NavItem(dbc.NavLink("Caracterização", href="/characterization")),
+            dbc.NavItem(dbc.NavLink("Seleção", href="/map")),
+            dbc.NavItem(dbc.NavLink("Análise de Resultados", href="/analysis")),
+        ], className="mx-auto")  # Centra os botões
+    ]),
+    color="primary",
+    dark=True,
+    sticky="top"
     ),
     dcc.Store(id='analysis-data'),
     dcc.Store(id='buildings-info-store'),

@@ -1,0 +1,17 @@
+:root {
+    --bs-primary: #009FE3;
+    --bs-primary-rgb: 0, 159, 227;
+}
+
+.btn-primary {
+    background-color: var(--bs-primary) !important;
+    border-color: var(--bs-primary) !important;
+}
+
+.bg-primary {
+    background-color: var(--bs-primary) !important;
+}
+
+.text-primary {
+    color: var(--bs-primary) !important;
+}

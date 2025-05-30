@@ -368,7 +368,7 @@ def algorithm(outlined_buildings=[], dropdownValue='By Demand', battery_efficien
     EC_total_savings.loc[1,'Savings (%)']=(E_total_cost_base - E_total_cost_EC_B)/E_total_cost_base
     EC_total_savings.loc[1,'Income_PV_total(€)']=E_total_income_EC_B
 
-    EC_total_savings.rename(index={0: 'Without BESS',1:'With BESS'},inplace=True)
+    EC_total_savings.rename(index={0: 'Sem baterias de armazenamento',1:'Com baterias de armazenamento'},inplace=True)
 
     EC_total_savings
 
@@ -455,7 +455,7 @@ def algorithm(outlined_buildings=[], dropdownValue='By Demand', battery_efficien
     EC_total.loc[1,'SS RATIO(%)']=1-(GRID_to_EC_withB/Demand)
     EC_total.loc[1,'AVERAGE SOC(%)']=(SOC_sum-SOCMAX_kWh)/8760/CAPACITY_kWh
 
-    EC_total.rename(index={0: 'Without BESS',1:'With BESS'},inplace=True)
+    EC_total.rename(index={0: 'Sem baterias de armazenamento',1:'Com baterias de armazenamento'},inplace=True)
 
     # EC_total.to_csv('EC_analysis_total.csv')
 
@@ -469,13 +469,13 @@ def create_figures(energy_consumption=None, buildings_savings=None, outlined_bui
     """
     if energy_consumption is None:
         energy_consumption = pd.read_csv('torres/EC_analysis_total.csv', usecols=['SS RATIO(%)', 'SC RATIO(%)'])
-        energy_consumption.rename(index={0: 'Without BESS', 1:'With BESS'},inplace=True)
+        energy_consumption.rename(index={0: 'Sem baterias de armazenamento', 1:'Com baterias de armazenamento'},inplace=True)
     if buildings_savings is None:
         buildings_savings = pd.read_csv('torres/EC_building_savings.csv', usecols=['Building', 'Ecost_base (€)', 'Ecost_SC (€)', 'Ecost_EC (€)', 'Ecost_EC_BESS (€)','PV_Power_W','PV_Investment_€'])
         buildings_savings.set_index('Building')
 
     consumption_columns = ['SS RATIO(%)', 'SC RATIO(%)']
-    ec_figure = px.bar(energy_consumption[consumption_columns], barmode='group', height=950,title="Self-consumption and self-sufficiency")
+    ec_figure = px.bar(energy_consumption[consumption_columns], barmode='group', height=950,title="Auto-consumo e auto-suficiência")
 
     renamed_columns = {
         'Ecost_base (€)': 'Custo de electricidade sem CE (€)',
@@ -493,7 +493,7 @@ def create_figures(energy_consumption=None, buildings_savings=None, outlined_bui
         y=list(renamed_columns.values()),
         barmode='group',
         height=950,
-        title="Energy costs annually"
+        title="Custos anuais de electricidade"
     )
 
     pv_columns = {
@@ -510,7 +510,7 @@ def create_figures(energy_consumption=None, buildings_savings=None, outlined_bui
         y=list(pv_columns.values()),
         barmode='group',
         height=950,
-        title="PV Power and Investment"
+        title="Potência instalada de fotovoltaico e investimento"
     )
 
     if buildings_savings is None:
@@ -652,7 +652,7 @@ def create_2d_map():
         zoom=16.5,
         width=1000,
         height=1300,
-        title="Annual Energy Cost (select a building set to run an EC analysis)"
+        title="Custo anual de electricidade (€)"
     )
     
     return map2d_figure
