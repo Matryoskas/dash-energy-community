@@ -32,24 +32,21 @@ tooltip = {
 layout_characterization = dbc.Container([
      html.Br(),
      html.Br(),
+    html.Br(),
+
     dbc.Row([
         html.H5("Caracterização dos edifícios", style={"fontWeight": "bold"}),
-        html.P(
-            "No mapa é possível caracterizar os edifícios relativamente à área de painel solar fotovoltaico (*) em % da área de cobertura disponível "
-            "e ao número de carros eléctricos **. Seleccione os edifícios a caracterizar usando a ferramenta Lasso ou Box no canto "
-            "superior do mapa, e irá aparecer um quadro. Se não quiser alterar a caracterização, avance para Seleção."
-                    ),
+        html.P([
+            "No mapa é possível caracterizar os edifícios relativamente à área de painel solar fotovoltaico (*) em % da área de cobertura disponível ",
+            "e ao número de carros eléctricos (**). Seleccione os edifícios a caracterizar usando a ferramenta ",
+            "Lasso ", html.Img(src='/assets/lasso select.jpg', style={'height': '1.2em', 'margin': '0 4px'}),
+            "ou ",
+            "Box ", html.Img(src='/assets/box select.jpg', style={'height': '1.2em', 'margin': '0 4px'}),
+            " no canto superior direito do mapa, e irá aparecer um quadro. Se não quiser alterar a caracterização, avance para Seleção."# alterar a frase...
+        ]),
     ]),
-    
-    html.Br(),
-    html.Div([
-        html.Img(src='/assets/lasso select.jpg', style={'width': '10%', 'marginRight': '2px'}),
-        html.Img(src='/assets/box select.jpg', style={'width': '10%'})
-    ], style={'display': 'flex', 'justifyContent': 'center'}),
-    html.Br(),
 
 
-    
     dbc.Row([
         dcc.Loading(type='graph', children=dcc.Graph(figure=map2d_initial, id='2d-map')),
         dbc.Card([dbc.CardHeader(id='building-details-title', children="Building Details"),
@@ -63,11 +60,11 @@ layout_characterization = dbc.Container([
     ]),
     dbc.Row([
         html.P(
-            "* Os painéis solares fotovoltaicos estão instalados segundo a inclinação optimizada para a maior produção anual," 
+            "* Os painéis solares fotovoltaicos estão instalados segundo a inclinação optimizada para a maior produção anual, " 
             "definida pelo software de modelação City Energy Analyst"
                     ),
         html.P(
-            "** É considerado que os veículos eléctricos carregam diariamente durante a noite"
+            "** Período diurno: 9h-16h; Período nocturno: 19h-02h"
                     )
     ]),
    
@@ -194,8 +191,9 @@ layout_analysis = dbc.Container([
 layout_intro = dbc.Container([
     html.Br(),
     html.Br(),
-    html.H4("EC+ Energia em Comunidade", style={'textAlign': 'center', "fontWeight": "bold"}),
-    html.H5("Análise da performance de Comunidades de Energia", style={'textAlign': 'center', "fontWeight": "bold"}),
+    html.Img(src='/assets/Logo EEC+png.png', style={
+                'width': '8%', 'height': 'auto', 'borderRadius': '8px','display': 'block','marginLeft': 'auto','marginRight': 'auto'
+            }),
     html.Br(),
 
     dbc.Row([
@@ -242,18 +240,24 @@ layout_intro = dbc.Container([
 
 
 
-
-
-
-
 # ------------------------------
 # Define the main app layout with a Navbar and a Location component.
 # ------------------------------
 app.layout = html.Div([
     dcc.Location(id='url', refresh=False),
     dbc.Navbar(
-    dbc.Container([
-        dbc.NavbarBrand("EC+ Energia em Comunidade", href="/", className="me-auto"),
+    dbc.Container([        
+        dbc.NavbarBrand(
+        html.Img(
+            src="/assets/Prancheta 15png.png",
+            height="30px",  # ou ajuste como preferir
+            style={"borderRadius": "5px"}  # opcional
+        ),
+        href="/",
+        className="me-auto"
+        ),
+            
+        
         dbc.Nav([
             dbc.NavItem(dbc.NavLink("Caracterização", href="/characterization")),
             dbc.NavItem(dbc.NavLink("Seleção", href="/map")),
