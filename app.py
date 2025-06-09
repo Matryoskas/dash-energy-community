@@ -26,14 +26,20 @@ tooltip = {
     )
 }
 
+def navigation_buttons(prev_href=None, next_href=None):
+    buttons = []
+    if prev_href:
+        buttons.append(dbc.Button("← Voltar", href=prev_href, color="secondary", className="me-2"))
+    if next_href:
+        buttons.append(dbc.Button("Avançar →", href=next_href, color="primary"))
+    
+    return html.Div(buttons, style={"textAlign": "center", "marginTop": "2rem"})
+
 # ------------------------------
 # Define the layout for the "Characterization" page.
 # ------------------------------
 layout_characterization = dbc.Container([
-     html.Br(),
-     html.Br(),
     html.Br(),
-
     dbc.Row([
         html.H5("Caracterização dos edifícios", style={"fontWeight": "bold"}),
         html.P([
@@ -42,7 +48,7 @@ layout_characterization = dbc.Container([
             "Lasso ", html.Img(src='/assets/lasso select.jpg', style={'height': '1.2em', 'margin': '0 4px'}),
             "ou ",
             "Box ", html.Img(src='/assets/box select.jpg', style={'height': '1.2em', 'margin': '0 4px'}),
-            " no canto superior direito do mapa, e irá aparecer um quadro. Se não quiser alterar a caracterização, avance para Seleção."# alterar a frase...
+            " no ", html.B("canto superior direito do mapa"), " e irá aparecer um quadro. Se não quiser alterar a caracterização, avance para Seleção."# alterar a frase...
         ]),
     ]),
 
@@ -67,7 +73,7 @@ layout_characterization = dbc.Container([
             "** Período diurno: 9h-16h; Período nocturno: 19h-02h"
                     )
     ]),
-   
+    navigation_buttons(prev_href="/", next_href="/map")  
 ])
 
 
@@ -75,7 +81,6 @@ layout_characterization = dbc.Container([
 # Define the layout for the "Seleção" page.
 # ------------------------------
 layout_map = dbc.Container([
-    html.Br(),
     html.Br(),
     dbc.Row([
         #dbc.Col([
@@ -86,11 +91,11 @@ layout_map = dbc.Container([
                 "A distribuição do excedente solar de produção de electricidade considera duas opções: "),
   
         html.P(
-                " - By demand - rateio horário de acordo com o consumo de electricidade dos edifícios participantes."
+                " - By demand - rasteio horário de acordo com o consumo de electricidade dos edifícios participantes."
                 ),
                        
         html.P(
-                " - By Electricity Production - rateio horário segundo a produção anual estimada de PV."
+                " - By Electricity Production - rasteio horário segundo a produção anual estimada de PV."
                         ,                        
                         style={'textAlign': 'left'}),
         html.P(
@@ -139,7 +144,8 @@ layout_map = dbc.Container([
             html.Span("    "),
             dbc.Button('Reset', color="secondary", id='reset-button'),
         ]),
-    ])
+    ]),
+    navigation_buttons(prev_href="/characterization")
 ]
     #, fluid=True
     )
@@ -148,7 +154,6 @@ layout_map = dbc.Container([
 # Define the layout for the "Data Analysis" page.
 # ------------------------------
 layout_analysis = dbc.Container([
-    html.Br(),
     html.Br(),
     html.H5("Análise de Resultados", style={'textAlign': 'left',"fontWeight": "bold"}),
     html.P(
@@ -182,14 +187,13 @@ layout_analysis = dbc.Container([
             width=12
         )
     ]),
-
+    navigation_buttons(prev_href="/map")
 ]
     #, fluid=True
     )
 
 # Página inicial com explicação
 layout_intro = dbc.Container([
-    html.Br(),
     html.Br(),
     html.Img(src='/assets/Logo EEC+png.png', style={
                 'width': '8%', 'height': 'auto', 'borderRadius': '8px','display': 'block','marginLeft': 'auto','marginRight': 'auto'
@@ -235,7 +239,7 @@ layout_intro = dbc.Container([
     html.Div(
         dbc.Button("Entrar no Dashboard", color="primary", href="/characterization", size="lg"),
         style={'textAlign': 'center'}
-    )
+    ),
 ])
 
 
@@ -256,13 +260,18 @@ app.layout = html.Div([
         href="/",
         className="me-auto"
         ),
-            
-        
+        # Progress indicator in navbar
+        html.Div(id='navbar-progress-container', style={"minWidth": "250px", "flexGrow": "1",
+                "display": "flex",
+                "flexDirection": "column",
+                "alignItems": "center",
+                "justifyContent": "center"}),
+    
         dbc.Nav([
             dbc.NavItem(dbc.NavLink("Caracterização", href="/characterization")),
             dbc.NavItem(dbc.NavLink("Seleção", href="/map")),
             dbc.NavItem(dbc.NavLink("Análise de Resultados", href="/analysis")),
-        ], className="mx-auto")  # Centra os botões
+        ]) 
     ]),
     color="primary",
     dark=True,
@@ -291,6 +300,32 @@ def display_page(pathname):
         return layout_characterization
     # Página inicial
     return layout_intro
+
+# ------------------------------
+# Navbar  callbacks
+# ------------------------------
+
+@callback(
+    Output('navbar-progress-container', 'children'),
+    Input('url', 'pathname')
+)
+def update_navbar_progress(pathname):
+    step_map = {
+        '/characterization': 1,
+        '/map': 2,
+        '/analysis': 3
+    }
+
+    if pathname not in step_map:
+        return ""  # No progress shown on intro page or unknown routes
+
+    current_step = step_map.get(pathname, 1)
+    percent = int((current_step / 3) * 100)
+    
+    return html.Div([
+        html.Small(f"Passo {current_step}/3", style={"color": "white", "fontWeight": "bold", "display": "block", "textAlign": "right"}),
+        dbc.Progress(value=percent, color="info", style={"height": "8px", "marginTop": "0.25rem"})
+    ], style={"minWidth": "250px"})
 
 # ------------------------------
 # Map page callbacks
