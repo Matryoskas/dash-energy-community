@@ -1,4 +1,4 @@
-from dash import Dash, html, dcc, callback, Output, Input, State, ctx, ALL
+from dash import Dash, html, dcc, callback, Output, Input, State, ctx, ALL, no_update
 from dash.exceptions import PreventUpdate
 import dash_deck
 import os
@@ -344,6 +344,7 @@ def update_navbar_progress(pathname):
     Output('3d-map', 'data'),
     Output('analysis-data', 'data'),
     Output('dropdown', 'value'),
+    Output('url', 'pathname'),
     State('battery-efficiency', 'value'),
     State('dropdown', 'value'),
     State('outlined-buildings-store', 'data'),
@@ -363,7 +364,7 @@ def update_map(batt_eff, current_dropdown, outlined_buildings, buildings_update,
             'savings': sav_fig,
             'pv': pv_fig
         }
-        return map3d_data, analysis_data, 'By Demand'
+        return map3d_data, analysis_data, 'By Demand', no_update
 
     if ctx.triggered_id == 'run-button':
         map3d_data, cons_fig, sav_fig, pv_fig = algorithm(
@@ -377,7 +378,7 @@ def update_map(batt_eff, current_dropdown, outlined_buildings, buildings_update,
             'savings': sav_fig,
             'pv': pv_fig
         }
-        return map3d_data, analysis_data, current_dropdown
+        return map3d_data, analysis_data, current_dropdown, '/analysis'
 
     raise PreventUpdate
 
